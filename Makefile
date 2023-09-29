@@ -19,23 +19,20 @@ endif
 RM = rm -f
 
 ### Build type ###
-# Choose 'debug' or 'release'
+# Choose 'debug', 'release', or 'unit_test'
 # Can also be chosen through make "BUILD_CONFIG=XX" from command line 
-# Or one can call make debug or make release directly
+# Or one can call make debug, make release, or make test directly
+BUILD_CONFIG = unit_test
 BUILD_CONFIG = release
 BUILD_CONFIG = debug
+UNIT_TEST_FILE = TestCompleteDisjunction.cpp
 
 ### Variables user should set ###
 PROJ_DIR=${PWD}
-#COIN_VERSION = 2.9
-#COIN_VERSION = 2.9r2376
-#COIN_VERSION = 2.10
-COIN_VERSION = trunk
-ifeq (${COIN_OR_HOME},)
-	COIN_OR = $(PROJ_DIR)/lib/Cbc-$(COIN_VERSION)
-else
-	COIN_OR = ${COIN_OR_HOME}
-endif
+COIN_VERSION = master
+COIN_OR = /Users/sean/coin-or
+GUROBI_DIR = /Library/gurobi912
+GUROBI_LINK="gurobi91"
 
 ifeq ($(USER),otherperson)
   #COIN_OR = enter/dir/here
@@ -96,15 +93,22 @@ endif
 USE_COIN   = 1
 USE_CLP    = 1
 USE_CBC    = 1
-USE_GUROBI = 1
-USE_CPLEX  = 1
+USE_GUROBI = 0
+USE_CPLEX  = 0
 USE_CLP_SOLVER = 1
 USE_CPLEX_SOLVER = 0
 
 # Concerning executable
-EXECUTABLE_STUB = vpc
+ifneq ($(BUILD_CONFIG),unit_test)
+	EXECUTABLE_STUB = vpc
+	MAIN_SRC = main.cpp
+endif
+# can make this take an argument for which unit test to build
+ifeq ($(BUILD_CONFIG),unit_test)
+	EXECUTABLE_STUB = UnitTest
+	SOURCES = test/$(UNIT_TEST_FILE)
+endif
 SRC_DIR = src
-MAIN_SRC = main.cpp
 DIR_LIST = $(SRC_DIR) $(SRC_DIR)/branch $(SRC_DIR)/cut $(SRC_DIR)/disjunction $(SRC_DIR)/utility
 
 # Code version
@@ -126,9 +130,11 @@ SOURCES = \
 		cut/CglVPC.cpp \
 		cut/CutHelper.cpp \
     cut/PRLP.cpp \
+    disjunction/CompleteDisjunction.cpp \
     disjunction/Disjunction.cpp \
     disjunction/PartialBBDisjunction.cpp \
     disjunction/SplitDisjunction.cpp \
+    disjunction/StrongBranchingDisjunction.cpp \
     disjunction/VPCDisjunction.cpp
 
 # For running tests (need not include these or main if releasing code to others)
@@ -136,10 +142,15 @@ DIR_LIST += $(SRC_DIR)/test
 SOURCES += test/analysis.cpp test/BBHelper.cpp test/DisjunctionHelper.cpp
 
 ### Set build values based on user variables ###
-ifeq ($(BUILD_CONFIG),debug)
+ifneq ($(BUILD_CONFIG),release)
   # "Debug" build - no optimization, include debugging symbols, and keep inline functions
 	SOURCES += utility/debug.cpp utility/vpc_debug.cpp
-  OUT_DIR = Debug
+  ifeq ($(BUILD_CONFIG),debug)
+    	OUT_DIR = Debug
+    endif
+    ifeq ($(BUILD_CONFIG),unit_test)
+  		OUT_DIR = UnitTest
+  	endif
   DEBUG_FLAG = -g3
   OPT_FLAG = -O0
   DEFS = -DTRACE -DPRINT_LP_WITH_CUTS -DVPC_VERSION="\#${VPC_VERSION}"
@@ -177,8 +188,8 @@ endif
 ifeq ($(USE_GUROBI),1)
   DEFS += -DUSE_GUROBI
   SOURCES += test/GurobiHelper.cpp
-  GUROBI_INC="${GUROBI_DIR}/include"
-  GUROBI_LIB="${GUROBI_DIR}/lib"
+  GUROBI_INC="${GUROBI_DIR}/mac64/include"
+  GUROBI_LIB="${GUROBI_DIR}/mac64/lib"
 endif
 ifeq ($(USE_CPLEX),1)
   DEFS += -DIL_STD -DUSE_CPLEX
@@ -192,7 +203,7 @@ endif
 ifeq ($(COIN_VERSION),2.10)
   DEFS += -DCBC_VERSION_210PLUS -DSAVE_NODE_INFO
 endif
-ifeq ($(COIN_VERSION),trunk)
+ifeq ($(COIN_VERSION),master)
   DEFS += -DCBC_VERSION_210PLUS -DCBC_TRUNK -DSAVE_NODE_INFO
 endif
 
@@ -244,15 +255,15 @@ endif
 # Set up COIN-OR stuff
 ifeq ($(USE_COIN),1)
 	# If not defined for the environment, define CBC / BCP here
-	ifeq ($(BUILD_CONFIG),debug)
-		CBC = $(COIN_OR)/buildg
+	ifneq ($(release),debug)
+		CBC = $(COIN_OR)/dist
 	endif
 	ifeq ($(BUILD_CONFIG),release)
-		CBC = $(COIN_OR)/build
+		CBC = $(COIN_OR)/dist
 	endif
 	CBClib = $(CBC)/lib
 	# When switching from svn to coinbrew, the new include directory is coin-or not coin
-	ifeq ($(COIN_VERSION),trunk)
+	ifeq ($(COIN_VERSION),master)
 		CBCinc = $(CBC)/include/coin-or
   else
 		CBCinc = $(CBC)/include/coin
@@ -291,6 +302,8 @@ debug: FORCE
 	@$(MAKE) "BUILD_CONFIG=debug"
 release: FORCE
 	@$(MAKE) "BUILD_CONFIG=release"
+unit_test: FORCE
+	@$(MAKE) "BUILD_CONFIG=unit_test"
 
 $(EXECUTABLE): $(MAIN_OBJ) $(OUT_OBJECTS)
 		@echo ' '
