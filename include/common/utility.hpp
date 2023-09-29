@@ -10,20 +10,12 @@
  */
 #pragma once
 
-// standard library
 #include <cstdio>
 #include <iostream> // cerr
-#include <memory> // shared_ptr
 #include <string>
 #include <vector>
 #include <cmath> // abs
 #include <limits> // numeric_limits
-
-// coin-or
-#include "SolverInterface.hpp" // SolverInterface
-
-// VPC
-#include <OsiSolverInterface.hpp>
 
 class CoinPackedVectorBase;
 class CoinPackedVector;
@@ -356,10 +348,4 @@ double dotProduct(int sizea, const int* indexa, const double* a, int sizeb,
 double getRowTwoNorm(const int row, const CoinPackedMatrix* const mat);
 void packedSortedVectorSum(CoinPackedVector& sum, const double mult1,
     const CoinPackedVectorBase& vec1, const double mult2,
-    const CoinPackedVectorBase& vec2, const double eps);
-
-bool variableBoundsContained(const OsiSolverInterface* const solver1,
-                             const OsiSolverInterface* const solver2);
-
-/// @brief create a mutable solver interface
-std::shared_ptr<SolverInterface> getSolver(const OsiSolverInterface* const si, FILE* logfile = NULL);
+    const CoinPackedVectorBase& vec2, const double eps); 
