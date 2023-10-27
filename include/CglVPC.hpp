@@ -79,7 +79,8 @@ public:
   enum class CutType {
     ONE_SIDED_CUT,  ///< cuts from disjunctions in which one side is empty
     OPTIMALITY_CUT, ///< objective cut added when optimal solution is found
-    VPC,            ///< generic vpcs
+    VPC,            ///< generic VPCs
+    GMIC,           ///< generic GMICs
     NUM_CUT_TYPES   ///< number of cut types
   }; /* CutType */
 
@@ -157,6 +158,10 @@ public:
 
     /// Get index of variable in NBVarIndex, and -1 if it is basic
     int getVarNBIndex(const int var) const {
+      if (var >= (int) rowOfVar.size()) {
+        return -1;
+      }
+
       if (rowOfVar[var] <= -1) {
         return -1 * (1 + rowOfVar[var]);
       } else {
