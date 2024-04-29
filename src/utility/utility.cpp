@@ -787,7 +787,7 @@ void sortBranchingDecisions(std::vector<int>& vars, std::vector<int>& bounds,
  *
  * @param solver the solver to check
  */
-void ensureMinimizationObjective(SolverInterface* solver){
+void ensureMinimizationObjective(OsiSolverInterface* const solver){
   if (solver->getObjSense() < 1e-3) {
     printf(
         "\n## Detected maximization problem. Negating objective function to make it minimization. ##\n");

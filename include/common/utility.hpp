@@ -21,6 +21,8 @@ class CoinPackedVectorBase;
 class CoinPackedVector;
 class CoinPackedMatrix;
 
+#include <SolverInterface.hpp>
+
 #define macro_to_string(s) #s
 #define x_macro_to_string(s) macro_to_string(s)
 
@@ -403,7 +405,7 @@ void sortBranchingDecisions(std::vector<int>& vars, std::vector<int>& bounds,
                             std::vector<double>& vals);
 
 /// @brief Check if the objective function is minimization. If not, negate it.
-void ensureMinimizationObjective(SolverInterface* solver);
+void ensureMinimizationObjective(OsiSolverInterface* const solver);
 
 /** check if sol is feasible for solver */
 bool isFeasible(
