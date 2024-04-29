@@ -201,7 +201,7 @@ void Disjunction::getSolverForTerm(
     exit(1);
   }
 
-  // Resolve and check the objective matches - //todo I think I can reduce the number of flags here
+  // Resolve and check the objective matches
 #ifdef TRACE
   printf("\n## Solving for term %d/%d. ##\n", term_ind+1, this->num_terms);
 #endif

@@ -897,7 +897,6 @@ CglVPC::ExitReason CglVPC::setupConstraints(OsiSolverInterface* const vpcsolver,
   // Now we handle the normal terms
   const int num_normal_terms = this->disjunction->terms.size();
   for (int tmp_ind = 0; tmp_ind < num_normal_terms; tmp_ind++) {
-    DisjunctiveTerm* term = &(this->disjunction->terms[tmp_ind]);
     terms_added++;
 
     if (!term->is_feasible && !params.get(intParam::RECYCLED_DISJUNCTION)) {
@@ -908,6 +907,7 @@ CglVPC::ExitReason CglVPC::setupConstraints(OsiSolverInterface* const vpcsolver,
     termSolver->disableFactorization();
 
     // Change bounds in the solver
+    DisjunctiveTerm* term = &(this->disjunction->terms[tmp_ind]);
     const int curr_num_changed_bounds = term->changed_var.size();
     std::vector < std::vector<int> > commonTermIndices(curr_num_changed_bounds);
     std::vector < std::vector<double> > commonTermCoeff(curr_num_changed_bounds);

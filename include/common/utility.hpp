@@ -10,20 +10,12 @@
  */
 #pragma once
 
-// standard library
 #include <cstdio>
 #include <iostream> // cerr
-#include <memory> // shared_ptr
 #include <string>
 #include <vector>
 #include <cmath> // abs
 #include <limits> // numeric_limits
-
-// coin-or
-#include "SolverInterface.hpp" // SolverInterface
-
-// VPC
-#include <OsiSolverInterface.hpp>
 
 class CoinPackedVectorBase;
 class CoinPackedVector;

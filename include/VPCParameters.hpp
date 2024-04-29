@@ -542,7 +542,7 @@ struct VPCParameters {
             4, std::numeric_limits<int>::min(), std::numeric_limits<int>::max())},
     {intParam::MODE,
         IntParameter(intParam::MODE, "MODE",
-            0, {0, 1, 3, 4})},
+            0, {0, 1, 3})},
     {intParam::GOMORY,
         IntParameter(intParam::GOMORY, "GOMORY",
             0, -1, 1)},

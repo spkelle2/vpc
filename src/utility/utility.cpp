@@ -15,7 +15,6 @@
 #include <CoinPackedVectorBase.hpp>
 #include <CoinPackedVector.hpp>
 #include <CoinPackedMatrix.hpp>
-#include <OsiSolverInterface.hpp>
 
 /**
  * @details Creates temporary file (in /tmp) so that it can be accessed later.
