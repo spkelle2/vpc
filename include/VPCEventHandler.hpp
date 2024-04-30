@@ -204,6 +204,7 @@ protected:
   bool foundSolution_ = false; ///< was an integer-feasible solution found?
   std::set<int> checked_nodes_; ///< nodes we have already checked for strong branching fixes
   std::set<int> sorted_nodes_; ///< nodes we have already sorted the branching decisions for
+  int numPrunedNodes_; ///< number of nodes implicitly created and pruned during strong branching
   ///@}
 
   ///@{
@@ -226,7 +227,7 @@ protected:
 
   /// @brief Set the warm start information for the parent node
   void setWarmStart(SolverInterface* tmpSolverBase, CoinWarmStartBasis* parent_basis,
-                    int tmp_ind, int node_id, const int curr_num_changed_bounds = 0,
+                    int tmp_ind = -1, int node_id = -1, const int curr_num_changed_bounds = 0,
                     const std::vector<std::vector<int> >& commonTermIndices = std::vector<std::vector<int> >(),
                     const std::vector<std::vector<double> >& commonTermCoeff = std::vector<std::vector<double> >(),
                     const std::vector<double>& commonTermRHS = std::vector<double>());
@@ -236,6 +237,9 @@ protected:
 
   /// @brief Save node information before we reach endSearch_
   int saveInformation();
+
+  /// @brief drop all tightened bounds occurring on continuous variables.
+  void removeContinuousVariableTightenedBounds(std::vector<NodeStatistics>& stat_vec);
 
   /// @brief reorder the branching decisions leading to each node in the tree in the order that they occurred
   void sortBranchingDecisions(const int node_id);
@@ -266,7 +270,7 @@ protected:
   int saveInformationWithPrunes();
 
   /// @brief check if the disjunction represents the leaves of a full binary tree
-  bool isFullBinaryTree();
+  void isFullBinaryTree();
   //@}
 };
 /* VPCEventHandler definition */

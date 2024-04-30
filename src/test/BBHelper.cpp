@@ -412,7 +412,7 @@ void createTmpFileCopy(
     std::string& f_name) {
   if (f_name.empty()) {
     try {
-      createTmpFilename(f_name, "");
+      createTmpFilename(f_name, "", params.get(stringParam::TMPFOLDER));
     } catch (const std::exception &e) {
       error_msg(errorstring, "Could not generate temp file: %s.\n", e.what());
       writeErrorToLog(errorstring, params.logfile);
@@ -421,6 +421,6 @@ void createTmpFileCopy(
   }
 
   solver->writeMps(f_name.c_str(), "mps", solver->getObjSense());
-  f_name += ".mps.gz"; // writeMps calls writeMpsNative, which invokes the CoinMpsIO writer with gzip option = 1
+  f_name += ".mps"; // writeMps calls writeMpsNative, which invokes the CoinMpsIO writer with gzip option = 1
 } /* createTmpFileCopy (Osi) */
 

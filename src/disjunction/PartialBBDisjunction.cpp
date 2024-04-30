@@ -275,6 +275,13 @@ DisjExitReason PartialBBDisjunction::prepareDisjunction(const OsiSolverInterface
       writeErrorToLog(errstr, params.logfile);
       exit(1);
     }
+  } else {
+    // exit early if we have a solution because we don't know how to handle it
+    if (eventHandler->owner->integer_sol.size() > 0){
+      printf("PartialBBDisjunction::prepareDisjunction: Handling for integer solution"
+             "in partial tree not developed for full tree. Discarding tree.\n");
+      return DisjExitReason::NO_DISJUNCTION_EXIT;
+    }
   }
 
   if (BBSolver && !cbc_model->modelOwnsSolver()) { delete BBSolver; }
@@ -323,20 +330,26 @@ PartialBBDisjunction PartialBBDisjunction::parameterize(const OsiSolverInterface
     // get the solver
     OsiSolverInterface* termSolver;
     this->getSolverForTerm(termSolver, term_idx, si, false, .001, NULL, true);
-    enableFactorization(termSolver, params.get(doubleParam::EPS));
 
     // get the term
     DisjunctiveTerm term = this->terms[term_idx];
 
     // update the necessary parts of the term
-    term.obj = termSolver->getObjValue();
-    term.basis = dynamic_cast<CoinWarmStartBasis*>(termSolver->getWarmStart());
     term.is_feasible = checkSolverOptimality(termSolver, true);
+    term.obj = term.is_feasible ? termSolver->getObjValue() : std::numeric_limits<double>::max();
+    enableFactorization(termSolver, params.get(doubleParam::EPS));
+    term.basis = dynamic_cast<CoinWarmStartBasis*>(termSolver->getWarmStart());
 
     // update the necessary disjunction metadata
     disj.updateObjValue(term.obj);
     disj.terms.push_back(term);
     disj.num_terms++;
+  }
+
+  // sanity check - egregious errors should be avoided by not counting objectives from infeasible terms
+  if (!lessThanVal(si->getObjValue(), disj.best_obj, -1e-7)) {
+    std::cout << "Warning: disjunctive dual bound should not be less than LP"
+                 "relaxation objective value. Sometimes this happens due to numerical issues." << std::endl;
   }
 
   // return the parameterized disjunction

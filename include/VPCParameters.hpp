@@ -117,6 +117,7 @@ enum stringParam {
   LOGFILE,
   OPTFILE,
   SOLFILE,
+  TMPFOLDER,
   NUM_STRING_PARAMS
 }; /* stringParam */
 
@@ -541,7 +542,7 @@ struct VPCParameters {
             4, std::numeric_limits<int>::min(), std::numeric_limits<int>::max())},
     {intParam::MODE,
         IntParameter(intParam::MODE, "MODE",
-            0, {0, 1, 3, 4})},
+            0, {0, 1, 3})},
     {intParam::GOMORY,
         IntParameter(intParam::GOMORY, "GOMORY",
             0, -1, 1)},
@@ -589,6 +590,8 @@ struct VPCParameters {
     {stringParam::DISJ_OPTIONS, StringParameter("DISJ_OPTIONS", "")},
     {stringParam::SOLFILE,
       StringParameter(stringParam::SOLFILE, "SOLFILE", "")},
+    {stringParam::TMPFOLDER,
+        StringParameter(stringParam::TMPFOLDER, "TMPFOLDER", "")},
     {stringParam::OPTFILE,
       StringParameter(stringParam::OPTFILE, "OPTFILE", "")},
     {stringParam::LOGFILE,

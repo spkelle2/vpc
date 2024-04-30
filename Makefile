@@ -20,25 +20,24 @@ endif
 RM = rm -f
 
 ### Build type ###
-# Choose 'debug', 'release', or 'unit_test'
+# Choose 'debug' or 'release'
 # Can also be chosen through make "BUILD_CONFIG=XX" from command line 
-# Or one can call make debug, make release, or make test directly
-BUILD_CONFIG = unit_test
+# Or one can call make debug or make release directly
 BUILD_CONFIG = release
 BUILD_CONFIG = debug
-UNIT_TEST_FILE = TestPartialBBDisjunction.cpp
+UNIT_TEST_FILE = TestVPCEventHandler.cpp
 
 ### Variables user should set ###
 PROJ_DIR=${PWD}
+#COIN_VERSION = 2.9
+#COIN_VERSION = 2.9r2376
+#COIN_VERSION = 2.10
 COIN_VERSION = trunk
-GUROBI_DIR = /Library/gurobi912
-GUROBI_LINK="gurobi91"
 ifeq (${COIN_OR_HOME},)
 	COIN_OR = $(PROJ_DIR)/lib/Cbc-$(COIN_VERSION)
 else
 	COIN_OR = ${COIN_OR_HOME}
 endif
-#COIN_OR = ${REPOS_DIR}/coin-or/Cbc-trunk_test
 
 ifeq ($(USER),otherperson)
   #COIN_OR = enter/dir/here
@@ -128,7 +127,7 @@ endif
 USE_COIN   = 1
 USE_CLP    = 1
 USE_CBC    = 1
-USE_GUROBI = 0
+USE_GUROBI = 1
 USE_CPLEX  = 0
 USE_CLP_SOLVER = 1
 USE_CPLEX_SOLVER = 0
@@ -147,6 +146,7 @@ ifeq ($(BUILD_CONFIG),unit_test)
 	MAIN_SRC = test/$(UNIT_TEST_FILE)
 endif
 SRC_DIR = src
+MAIN_SRC = main.cpp
 DIR_LIST = $(SRC_DIR) $(SRC_DIR)/branch $(SRC_DIR)/cut $(SRC_DIR)/disjunction $(SRC_DIR)/utility
 
 # Code version
@@ -181,15 +181,10 @@ ifeq ($(CALC_COND_NUM), 1)
 endif
 
 ### Set build values based on user variables ###
-ifneq ($(BUILD_CONFIG),release)
+ifeq ($(BUILD_CONFIG),debug)
   # "Debug" build - no optimization, include debugging symbols, and keep inline functions
 	SOURCES += utility/debug.cpp utility/vpc_debug.cpp
-  ifeq ($(BUILD_CONFIG),debug)
-    	OUT_DIR = Debug
-    endif
-    ifeq ($(BUILD_CONFIG),unit_test)
-  		OUT_DIR = UnitTest
-  	endif
+  OUT_DIR = Debug
   DEBUG_FLAG = -g3
   OPT_FLAG = -O0
   DEFS = -DTRACE -DPRINT_LP_WITH_CUTS -DVPC_VERSION="\#${VPC_VERSION}"
@@ -222,13 +217,15 @@ endif
 ifeq ($(USE_CBC),1)
   DEFS += -DUSE_CBC
   DEFS += -DVPC_CBC_VERSION="\#${VPC_CBC_VERSION}"
-  SOURCES += test/CbcHelper.cpp
+  SOURCES += test/CbcHelper.cpp \
+      test/CglStoredVpc.cpp \
+      test/CbcSolverHeuristics.cpp
 endif
 ifeq ($(USE_GUROBI),1)
   DEFS += -DUSE_GUROBI
   SOURCES += test/GurobiHelper.cpp
-  GUROBI_INC="${GUROBI_DIR}/mac64/include"
-  GUROBI_LIB="${GUROBI_DIR}/mac64/lib"
+  GUROBI_INC="${GUROBI_DIR}/include"
+  GUROBI_LIB="${GUROBI_DIR}/lib"
 endif
 ifeq ($(USE_CPLEX),1)
   DEFS += -DIL_STD -DUSE_CPLEX
@@ -344,8 +341,6 @@ debug: FORCE
 	@$(MAKE) "BUILD_CONFIG=debug"
 release: FORCE
 	@$(MAKE) "BUILD_CONFIG=release"
-unit_test: FORCE
-	@$(MAKE) "BUILD_CONFIG=unit_test"
 
 $(EXECUTABLE): $(MAIN_OBJ) $(OUT_OBJECTS)
 		@echo ' '

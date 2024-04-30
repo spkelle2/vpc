@@ -131,6 +131,7 @@ void Disjunction::setupAsNew() {
   this->common_ineqs.resize(0);
 #endif
   this->num_terms = 0;
+  this->num_pruned_terms = 0;
   for (auto& term : this->terms)
     term.clear();
   this->terms.resize(0);
@@ -200,7 +201,7 @@ void Disjunction::getSolverForTerm(
     exit(1);
   }
 
-  // Resolve and check the objective matches - //todo I think I can reduce the number of flags here
+  // Resolve and check the objective matches
 #ifdef TRACE
   printf("\n## Solving for term %d/%d. ##\n", term_ind+1, this->num_terms);
 #endif
@@ -382,6 +383,7 @@ void Disjunction::initialize(const Disjunction* const source) {
     this->common_ineqs = source->common_ineqs;
 #endif
     this->num_terms = source->num_terms;
+    this->num_pruned_terms = source->num_pruned_terms;
     for (auto& term : this->terms)
       term.clear();
     this->terms = source->terms;

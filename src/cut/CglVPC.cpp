@@ -942,10 +942,9 @@ CglVPC::ExitReason CglVPC::setupConstraints(OsiSolverInterface* const vpcsolver,
     }
 
     // Resolve and check the objective matches
-#ifdef TRACE
+    // taking this off trace only because I need it for tracking number of terms in current release
     printf("\n## CglVPC::setupConstraints: Solving for term %d/%d. ##\n",
         tmp_ind + 1, num_normal_terms);
-#endif
     termSolver->resolve();
     term->is_feasible = checkSolverOptimality(termSolver, true);
     //enableFactorization(termSolver, params.get(doubleParam::EPS)); // this may change the solution slightly
@@ -954,11 +953,13 @@ CglVPC::ExitReason CglVPC::setupConstraints(OsiSolverInterface* const vpcsolver,
     // this value isn't going to make sense if we recycle the disjunction
     if (term->is_feasible && !isInfinity(term->obj) && !params.get(intParam::RECYCLED_DISJUNCTION)) {
       // Sometimes we run into a few issues getting the ``right'' value
-      const double newval = termSolver->getObjValue();
+      double newval = termSolver->getObjValue();
       const double savedval = term->obj;
       const double epsilon = params.get(doubleConst::DIFFEPS);
+      // double check to make sure CLP didn't trip on its own shoelaces
       if (!isVal(newval, savedval, epsilon)) {
         termSolver->resolve();
+        newval = termSolver->getObjValue();
       }
       if (!isVal(newval, savedval, epsilon)) {
         double ratio = 1.;
@@ -1469,7 +1470,5 @@ void CglVPC::finish(CglVPC::ExitReason exitReason) {
   }
   this->exitReason = exitReason;
   this->timer.end_timer(timeName);
-#ifdef TRACE
   printf("CglVPC: Finishing with exit reason: %s. Number cuts: %d.\n", CglVPC::ExitReasonName[static_cast<int>(exitReason)].c_str(), num_cuts);
-#endif
 } /* finish */

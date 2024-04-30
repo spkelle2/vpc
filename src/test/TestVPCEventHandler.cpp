@@ -65,8 +65,9 @@ TEST_CASE("Test saveInformation", "[VPCEventHandler::saveInformation]") {
 
   SECTION( "Test with strong branching terms" ) {
 
-    // make sure to save the full tree
+    // make sure to save the full tree and update to keep same active leaves at end
     vpc_params.set(VPCParametersNamespace::PARTIAL_BB_KEEP_PRUNED_NODES, 1);
+    vpc_params.set(VPCParametersNamespace::DISJ_TERMS, 7);
 
     // make disjunction
     PartialBBDisjunction disj = PartialBBDisjunction(vpc_params);
@@ -114,7 +115,7 @@ TEST_CASE("Test saveInformation", "[VPCEventHandler::saveInformation]") {
   solver = const_cast<SolverInterface*>(dynamic_cast<const SolverInterface*>(&si));
 
   // create 64 terms so we get a couple of pruned ones
-  vpc_params.set(VPCParametersNamespace::DISJ_TERMS, 64);
+  vpc_params.set(VPCParametersNamespace::DISJ_TERMS, 69);
 
   SECTION( "Test with pruned terms and strong branching terms" ) {
 
@@ -140,6 +141,7 @@ TEST_CASE("Test saveInformation", "[VPCEventHandler::saveInformation]") {
     }
     // should have 2 pruned terms and 64 leaves
     REQUIRE(pruned.size() == 2);
+    REQUIRE(complement.size() == 3);
     REQUIRE(leaf.size() == 64);
 
     // check that we have no common terms anymore
@@ -183,11 +185,13 @@ TEST_CASE("Test saveInformation", "[VPCEventHandler::saveInformation]") {
     REQUIRE(disj.integer_obj > 1e300);
   }
 
-  // make sure that we see the same number of cuts and bound improvement regardless of saving the full tree
+  // make sure that we see the same number of cuts and bound improvement
+  // regardless of saving the full tree for the same number of total active leaves
   SECTION( "Test integrations" ) {
 
     // create parameters
     VPCParametersNamespace::VPCParameters partial_disj_params = vpc_params;
+    partial_disj_params.set(VPCParametersNamespace::DISJ_TERMS, 64);
     VPCParametersNamespace::VPCParameters full_disj_params = vpc_params;
     full_disj_params.set(VPCParametersNamespace::PARTIAL_BB_KEEP_PRUNED_NODES, 1);
 
@@ -218,8 +222,9 @@ TEST_CASE("Test saveInformation", "[VPCEventHandler::saveInformation]") {
     full_tree_solver->resolve();
 
     // now make our checks
-    // check that the full tree disjunction has more terms
+    // check that the full tree disjunction has more terms, but the same number of active leaves
     REQUIRE(full_gen.disj()->num_terms > partial_gen.disj()->num_terms);
+    REQUIRE(full_gen.disj()->num_terms - full_gen.disj()->num_pruned_terms == partial_gen.disj()->num_terms);
 
     // check that we have the same number of cuts
     REQUIRE(partial_tree_vpcs.sizeCuts() == full_tree_vpcs.sizeCuts());
@@ -230,4 +235,32 @@ TEST_CASE("Test saveInformation", "[VPCEventHandler::saveInformation]") {
   }
 }
 
+// --------------------- test current behavior remains -------------------------
+TEST_CASE("Test removeContinuousVariableTightenedBounds",
+          "[VPCEventHandler::removeContinuousVariableTightenedBounds]") {
 
+  // parameters
+  VPCParametersNamespace::VPCParameters vpc_params;
+  vpc_params.set(VPCParametersNamespace::DISJ_TERMS, 2);
+  vpc_params.set(VPCParametersNamespace::MODE, 0);  // partial BB tree
+  vpc_params.set(VPCParametersNamespace::PARTIAL_BB_KEEP_PRUNED_NODES, 1);  // save full tree
+
+  // solver
+  OsiClpSolverInterface si;
+  SolverInterface* solver;
+  si.readMps("../test/dcmulti_7.mps");
+  si.initialSolve();
+  solver = const_cast<SolverInterface*>(dynamic_cast<const SolverInterface*>(&si));
+
+  // make disjunction
+  PartialBBDisjunction disj = PartialBBDisjunction(vpc_params);
+  disj.prepareDisjunction(solver);
+
+  // ensure all bounds tightened by the disjunctive term belong to integer variables
+  // this would fail without calling removeContinuousVariableTightenedBounds
+  for (const DisjunctiveTerm& term : disj.terms) {
+    for (const int& v : term.changed_var) {
+      REQUIRE(si.isInteger(v));
+    }
+  }
+}

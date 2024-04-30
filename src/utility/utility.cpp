@@ -15,17 +15,18 @@
 #include <CoinPackedVectorBase.hpp>
 #include <CoinPackedVector.hpp>
 #include <CoinPackedMatrix.hpp>
-#include <OsiSolverInterface.hpp>
 
 /**
  * @details Creates temporary file (in /tmp) so that it can be accessed later.
  * It does not delete the file.
  */
 void createTmpFilename(std::string& f_name,
-    const std::string add_ext) {
+    const std::string add_ext, const std::string tmp_folder) {
 //  if (f_name.empty()) {
     // Generate temporary file name
-    char template_name[] = "/tmp/tmpvpcXXXXXX";
+    std::string str_name = tmp_folder.empty() ? "/tmp/tmpvpcXXXXXX" : tmp_folder + "/tmpvpcXXXXXX";
+    char template_name[str_name.size() + 1];
+    strcpy(template_name, str_name.c_str());
 
     mkstemp(template_name);
     f_name = template_name;
@@ -620,23 +621,29 @@ std::shared_ptr<SolverInterface> getSolver(const OsiSolverInterface* const si, F
   return solver;
 }
 
-/// @brief Find the indices of elements in vector1 that are not in vector2
-std::vector<int> findIndicesOfDifference(std::vector<int> vector1, std::vector<int> vector2) {
-  // Map element values to their indices in vector2
-  std::unordered_map<int, int> indexMap;
-  // Store indices of elements in vector1 not found in vector2
+/// @brief Find the branching decisions leading to the child that are not present in the parent (i.e. fixed by strong branching)
+std::vector<int> findIndicesOfDifference(std::vector<int> child_var, std::vector<int> parent_var,
+                                         std::vector<int> child_bound, std::vector<int> parent_bound,
+                                         std::vector<double> child_value, std::vector<double> parent_value) {
+
+  // vector to hold which indices of child branching decisions are not present in parent
   std::vector<int> indices;
 
-  // Populate the indexMap with elements from vector2
-  for (int i = 0; i < vector2.size(); ++i) {
-    indexMap[vector2[i]] = i;
-  }
+  // Iterate through branching decisions leading to child node
+  for (int i = 0; i < child_var.size(); ++i) {
+    bool found = false;
 
-  // Iterate through vector1 and check if each element exists in vector2
-  for (int i = 0; i < vector1.size(); ++i) {
-    auto it = indexMap.find(vector1[i]);
-    if (it == indexMap.end()) {
-      // Element from vector1 not found in vector2
+    // iterate over branching decisions leading to parent node
+    for (int j = 0; j < parent_var.size(); ++j) {
+
+      // if child branching decision is found, move on to check the next decision
+      if (child_var[i] == parent_var[j] && child_bound[i] == parent_bound[j] && child_value[i] == parent_value[j]) {
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      // Element from child_var not found in parent_var
       indices.push_back(i);
     }
   }
@@ -715,12 +722,13 @@ void checkBounds(const OsiSolverInterface* const solver, const std::vector<int>&
     const double val = fixed_value[idx];
 
     checkColumnAndBound(solver, col, bound);
+    // checking for satisfaction and not equality because general integers may be branched on multiple times
     if (bound <= 0) {
-      verify((solver->getColLower()[col] == val) == isTrue,
+      verify((solver->getColLower()[col] >= val) == isTrue,
              "The branching decisions in fixed_var, fixed_bound, and fixed_value "
              "are inconsistent with the expectations on the solver.");
     } else {
-      verify((solver->getColUpper()[col] == val) == isTrue,
+      verify((solver->getColUpper()[col] <= val) == isTrue,
              "The branching decisions in fixed_var, fixed_bound, and fixed_value "
              "are inconsistent with the expectations on the solver.");
     }
@@ -733,7 +741,7 @@ void checkBounds(const OsiSolverInterface* const solver, const std::vector<int>&
  *
  * @param solver The solver to check
  * @param col The column to check
- * @param bound The bound to check
+ * @param bound The bound to check (0 for lower (up branch) and 1 for upper (down branch))
  */
 void checkColumnAndBound(const OsiSolverInterface* const solver, const int col,
                          const int bound){
@@ -779,7 +787,7 @@ void sortBranchingDecisions(std::vector<int>& vars, std::vector<int>& bounds,
  *
  * @param solver the solver to check
  */
-void ensureMinimizationObjective(SolverInterface* solver){
+void ensureMinimizationObjective(OsiSolverInterface* const solver){
   if (solver->getObjSense() < 1e-3) {
     printf(
         "\n## Detected maximization problem. Negating objective function to make it minimization. ##\n");

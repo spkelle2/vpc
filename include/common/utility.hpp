@@ -10,24 +10,18 @@
  */
 #pragma once
 
-// standard library
 #include <cstdio>
 #include <iostream> // cerr
-#include <memory> // shared_ptr
 #include <string>
 #include <vector>
 #include <cmath> // abs
 #include <limits> // numeric_limits
 
-// coin-or
-#include "SolverInterface.hpp" // SolverInterface
-
-// VPC
-#include <OsiSolverInterface.hpp>
-
 class CoinPackedVectorBase;
 class CoinPackedVector;
 class CoinPackedMatrix;
+
+#include <SolverInterface.hpp>
 
 #define macro_to_string(s) #s
 #define x_macro_to_string(s) macro_to_string(s)
@@ -154,7 +148,8 @@ inline void writeErrorToLog(std::string text, FILE *myfile) {
 }
 
 /** @brief Create temporary filename */
-void createTmpFilename(std::string& f_name, const std::string add_ext = "");
+void createTmpFilename(std::string& f_name, const std::string add_ext = "",
+                       const std::string tmp_folder = "");
 
 /** @brief Separate filename into the directory, instance name, and extension */
 int parseFilename(std::string& dir, std::string& instname, std::string& in_file_ext, const std::string& fullfilename, FILE* logfile);
@@ -364,8 +359,10 @@ bool variableBoundsContained(const OsiSolverInterface* const solver1,
 /// @brief create a mutable solver interface
 std::shared_ptr<SolverInterface> getSolver(const OsiSolverInterface* const si, FILE* logfile = NULL);
 
-/// @brief Find the indices of elements in vector1 that are not in vector2
-std::vector<int> findIndicesOfDifference(std::vector<int> vector1, std::vector<int> vector2);
+/// @brief Find the branching decisions leading to the child that are not present in the parent (i.e. fixed by strong branching)
+std::vector<int> findIndicesOfDifference(std::vector<int> child_var, std::vector<int> parent_var,
+                                         std::vector<int> child_bound, std::vector<int> parent_bound,
+                                         std::vector<double> child_value, std::vector<double> parent_value);
 
 /// @brief Return message if condition is not true
 void verify(bool condition, const std::string& msg);
@@ -408,7 +405,7 @@ void sortBranchingDecisions(std::vector<int>& vars, std::vector<int>& bounds,
                             std::vector<double>& vals);
 
 /// @brief Check if the objective function is minimization. If not, negate it.
-void ensureMinimizationObjective(SolverInterface* solver);
+void ensureMinimizationObjective(OsiSolverInterface* const solver);
 
 /** check if sol is feasible for solver */
 bool isFeasible(

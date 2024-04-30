@@ -51,7 +51,6 @@ void setStrategyForBBTestGurobi(const VPCParameters& params, const int strategy,
   if (seed >= 0) {
     model.set(GRB_IntParam_Seed, seed); // random seed
   }
-//  model.set(GRB_DoubleParam_MIPGap, param.getEPS()); // I guess the default 1e-4 is okay, though it messes up for large objective values
 
   if (params.get(VERBOSITY) == 0) {
     model.set(GRB_IntParam_OutputFlag, 0); // turn off output
@@ -92,7 +91,7 @@ void setStrategyForBBTestGurobi(const VPCParameters& params, const int strategy,
         // BestBdStop: stop when dual bound >= z
         // Cutoff: prune subtrees with objective value > z
         //model.set(GRB_DoubleParam_BestObjStop, best_bound + 1e-3); // give the solver the best IP objective value (it is a minimization problem) with a tolerance
-        model.set(GRB_DoubleParam_BestBdStop, best_bound - 1e-7); // give the solver the best IP objective value (it is a minimization problem) with a tolerance
+        model.set(GRB_DoubleParam_BestBdStop, best_bound * (1 - 1e-5)); // give the solver the best dual bound (it is a minimization problem) with a tolerance
         //model.set(GRB_DoubleParam_Cutoff, best_bound + 1e-3); // give the solver the best IP objective value (it is a minimization problem) with a tolerance
       }
       // Check if user provides mip start or solution file
@@ -300,9 +299,12 @@ class GurobiUserCutCallback : public GRBCallback {
 //          std::string msg = GRBCallback::getStringInfo(GRB_CB_MSG_STRING);
 //        } /* where == MESSAGE */
       } catch (GRBException& e) {
-        error_msg(errorstring, "Gurobi: Error during callback: %s\n", e.getMessage().c_str());
-        writeErrorToLog(errorstring, params.logfile);
-        exit(1);
+        // ignore warnings that a cut was skipped - that's not critical
+        if (e.getMessage() != "addCut"){
+          error_msg(errorstring, "Gurobi: Error during callback: %s\n", e.getMessage().c_str());
+          writeErrorToLog(errorstring, params.logfile);
+          exit(1);
+        }
       } catch (...) {
         error_msg(errorstring, "Gurobi: Error during callback.\n");
         writeErrorToLog(errorstring, params.logfile);
@@ -626,7 +628,13 @@ void doBranchAndBoundWithUserCutsGurobi(const VPCParameters& params, int strateg
     const double best_bound, const bool addAsLazy) {
   std::string f_name;
   createTmpFileCopy(params, solver, f_name);
+  // create a new strings to match what was actually created
+  std::string f_name_no_ext = f_name.substr(0, f_name.size() - 4);
+  std::string f_name_gz = f_name + ".gz";
   doBranchAndBoundWithUserCutsGurobi(params, strategy, f_name.c_str(), cuts, info, best_bound, addAsLazy);
-  remove(f_name.c_str()); // remove temporary file
+  // remove temporary files
+  remove(f_name.c_str());
+  remove(f_name_gz.c_str());
+  remove(f_name_no_ext.c_str());
 } /* doBranchAndBoundWithUserCutsGurobi (Osi) */
 #endif /* USE_GUROBI */
