@@ -349,7 +349,7 @@ void setCompNBCoorRay(CoinPackedVector& vec, const double* ray, double& objViola
           "Ray %d: dot product with obj < 0. Obj viol from solver: %.8f. Calculated: %.8f.\n",
           tmpNBVar, objViolation, nonTinyObj);
       writeErrorToLog(errorstring, params.logfile);
-      exit(1);
+      verify(false, "VPC tried to exit with error code 1");
     } else {
       warning_msg(warnstring,
           "Ray %d: dot product with obj < 0. Obj viol from solver: %.8f. Calculated: %.8f.\n",
@@ -363,7 +363,7 @@ void setCompNBCoorRay(CoinPackedVector& vec, const double* ray, double& objViola
           "Ray %d: Calculated dot product with obj differs from solver's. Obj viol from solver: %.8f. Calculated: %.8f.\n",
           tmpNBVar, objViolation, nonTinyObj);
       writeErrorToLog(errorstring, params.logfile);
-      exit(1);
+      verify(false, "VPC tried to exit with error code 1");
     } else {
       warning_msg(warnstring,
           "Ray %d: Calculated dot product with obj differs from solver's. Obj viol from solver: %.8f. Calculated: %.8f.\n",
@@ -542,7 +542,7 @@ void setCompNBCoor(
           "Calculated dot product with obj differs from solver's. Obj viol from solver: %.8f. Calculated: %.8f.\n",
           objViolation, nonTinyObj);
       writeErrorToLog(errorstring, params.logfile);
-      exit(1);
+      verify(false, "VPC tried to exit with error code 1");
     } else {
       warning_msg(warnstring,
           "Calculated dot product with obj differs from solver's. Obj viol from solver: %.8f. Calculated: %.8f.\n",

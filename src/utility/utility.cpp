@@ -59,7 +59,7 @@ int parseFilename(
   if (found_dot >= fullfilename.length()) {
     warning_msg(warnstring, "Cannot find the file extension (no '.' in input file name: \"%s\").\n", fullfilename.c_str());
 //    writeErrorToLog(errorstring, logfile);
-//    exit(1);
+//    verify(false, "VPC tried to exit with error code 1");
     return 1;
   }
 
@@ -77,7 +77,7 @@ int parseFilename(
           "Other than gz or bz2, cannot find the file extension (no '.' in input file name: \"%s\").\n",
           fullfilename.c_str());
 //      writeErrorToLog(errorstring, logfile);
-//      exit(1);
+//      verify(false, "VPC tried to exit with error code 1");
       return 1;
     }
   }
@@ -133,7 +133,7 @@ double getObjValueFromFile(std::string opt_filename, std::string fullfilename, F
     // If we were not able to open the file, throw an error
     error_msg(errorstring, "Not able to open obj file %s.\n", opt_filename.c_str());
     writeErrorToLog(errorstring, logfile);
-    exit(1);
+    verify(false, "VPC tried to exit with error code 1");
   }
 
   return std::numeric_limits<double>::lowest();
@@ -187,7 +187,7 @@ void getSolFromFile(
   } else {
     // If we were not able to open the file, throw an error
     error_msg(errorstring, "Not able to open solution file %s.\n", filename);
-    exit(1);
+    verify(false, "VPC tried to exit with error code 1");
   }
 
   return;
@@ -599,7 +599,7 @@ std::shared_ptr<SolverInterface> getSolver(const OsiSolverInterface* const si, F
   } catch (std::exception& e) {
     error_msg(errorstring, "Unable to clone solver into desired SolverInterface.\n");
     writeErrorToLog(errorstring, logfile);
-    exit(1);
+    verify(false, "VPC tried to exit with error code 1");
   }
 #ifdef USE_CLP
   try {
@@ -614,7 +614,7 @@ std::shared_ptr<SolverInterface> getSolver(const OsiSolverInterface* const si, F
     if (!solver->isProvenOptimal()) {
       error_msg(errorstring, "Solver must be optimal to create disjunction.\n");
       writeErrorToLog(errorstring, logfile);
-      exit(1);
+      verify(false, "VPC tried to exit with error code 1");
     }
   }
   solver->enableFactorization();
@@ -653,10 +653,15 @@ std::vector<int> findIndicesOfDifference(std::vector<int> child_var, std::vector
 }
 
 /// @brief Return message if condition is not true
-void verify(bool condition, const std::string& msg) {
+void verify(bool condition, const std::string& msg, bool catchable) {
   if (!condition) {
+    // cause failure with a stack trace
     std::cerr << msg << std::endl;
-    assert(false);  // cause failure with a stack trace
+    if (catchable) {
+      throw std::runtime_error("Assertion failed");
+    } else {
+      assert(false);
+    }
   }
 }
 

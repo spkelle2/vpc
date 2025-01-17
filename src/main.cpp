@@ -134,7 +134,7 @@ const std::string CPLEX_VERSION_STRING = std::to_string(CPX_VERSION_VERSION) + "
 void signal_handler_with_error_msg(int signal_number) {
   error_msg(errorstring, "Abort or seg fault message received. Signal number: %d.\n", signal_number);
   writeErrorToLog(errorstring, params.logfile);
-  exit(1);
+  verify(false, "VPC tried to exit with error code 1");
 } /* signal_handler_with_error_msg */
 
 int startUp(int argc, char** argv);
@@ -169,7 +169,7 @@ int main(int argc, char** argv) {
   if (!checkSolverOptimality(solver, false)) {
     error_msg(errorstring, "Unable to solve initial LP relaxation.\n");
     writeErrorToLog(errorstring, params.logfile);
-    exit(1);
+    verify(false, "VPC tried to exit with error code 1");
   }
   timer.end_timer(OverallTimeStats::INIT_SOLVE_TIME);
   boundInfo.lp_obj = solver->getObjValue();
@@ -187,7 +187,7 @@ int main(int argc, char** argv) {
     } else {
       std::cerr << "Barrier method does not result in optimal solution." << std::endl;
     }
-    exit(1);
+    verify(false, "VPC tried to exit with error code 1");
   } **/
 
   //====================================================================================================//
@@ -274,7 +274,7 @@ int main(int argc, char** argv) {
     if (!cutrounds_logfile) {
       error_msg(errorstring, "Unable to open file: %s.\n", fileWithCuts.c_str());
       writeErrorToLog(errorstring, params.logfile);
-      exit(1);
+      verify(false, "VPC tried to exit with error code 1");
     }
     printf("\n## Round-by-round information will be saved to file: %s. ##\n", fileWithCuts.c_str());
 
@@ -676,7 +676,7 @@ int startUp(int argc, char** argv) {
   if (params.get(stringParam::FILENAME).empty()) {
     error_msg(errorstring,
         "No instance file provided. Use -f /path/to/instance.mps to specify the instance.\n");
-    exit(1);
+    verify(false, "VPC tried to exit with error code 1");
   }
   printf("Instance file: %s\n", params.get(stringParam::FILENAME).c_str());
   
@@ -685,7 +685,7 @@ int startUp(int argc, char** argv) {
         "Unable to parse filename: %s. Found: dir=\"%s\", instname=\"%s\",ext=\"%s\".\n",
         params.get(stringParam::FILENAME).c_str(), dir.c_str(),
         instname.c_str(), in_file_ext.c_str());
-    exit(1);
+    verify(false, "VPC tried to exit with error code 1");
   }
   filename_stub = dir + "/" + instname;
 
@@ -901,7 +901,7 @@ void doCustomRoundOfCuts(int round_ind, OsiCuts& vpcs, CglVPC& gen, int& num_dis
       error_msg(errorstring,
           "Though status is that optimal integer solution found, unable to find this solution.\n");
       writeErrorToLog(errorstring, params.logfile);
-      exit(1);
+      verify(false, "VPC tried to exit with error code 1");
     }
     for (int col = 0; col < solver->getNumCols(); col++) {
       const double val = solution[col];
@@ -959,7 +959,7 @@ void doCustomRoundOfCuts(int round_ind, OsiCuts& vpcs, CglVPC& gen, int& num_dis
   else {
     error_msg(errorstring, "Unknown exit reason (%s) from setDisjunctions.\n", CglVPC::ExitReasonName[static_cast<int>(setDisjExitReason)].c_str());
     writeErrorToLog(errorstring, params.logfile);
-    exit(1);
+    verify(false, "VPC tried to exit with error code 1");
   }
 
   // Delete disjunctions
@@ -1038,7 +1038,7 @@ int processArgs(int argc, char** argv) {
                   intParam param = intParam::BB_RUNS;
                   if (!parseInt(optarg, val)) {
                     error_msg(errorstring, "Error reading %s. Given value: %s.\n", params.name(param).c_str(), optarg);
-                    exit(1);
+                    verify(false, "VPC tried to exit with error code 1");
                   }
                   params.set(param, val);
                   break;
@@ -1048,7 +1048,7 @@ int processArgs(int argc, char** argv) {
                   intParam param = intParam::BB_MODE;
                   if (!parseInt(optarg, val)) {
                     error_msg(errorstring, "Error reading %s. Given value: %s.\n", params.name(param).c_str(), optarg);
-                    exit(1);
+                    verify(false, "VPC tried to exit with error code 1");
                   }
                   params.set(param, val);
                   break;
@@ -1058,19 +1058,19 @@ int processArgs(int argc, char** argv) {
                   intParam param = intParam::BB_STRATEGY;
                   if (!parseInt(optarg, val)) {
                     error_msg(errorstring, "Error reading %s. Given value: %s.\n", params.name(param).c_str(), optarg);
-                    exit(1);
+                    verify(false, "VPC tried to exit with error code 1");
                   }
                   params.set(param, val);
                   if (use_bb_option(val, BB_Strategy_Options::gurobi)) {
 #ifndef USE_GUROBI
                     error_msg(errorstring, "Requesting to use Gurobi, but macro USE_GUROBI not set.\n");
-                    exit(1);
+                    verify(false, "VPC tried to exit with error code 1");
 #endif
                   }
                   if (use_bb_option(val, BB_Strategy_Options::cplex)) {
 #ifndef USE_CPLEX
                     error_msg(errorstring, "Requesting to use CPLEX, but macro USE_CPLEX not set.\n");
-                    exit(1);
+                    verify(false, "VPC tried to exit with error code 1");
 #endif
                   }
                   break;
@@ -1080,7 +1080,7 @@ int processArgs(int argc, char** argv) {
                   doubleParam param = doubleParam::BB_TIMELIMIT;
                   if (!parseDouble(optarg, val)) {
                     error_msg(errorstring, "Error reading %s. Given value: %s.\n", params.name(param).c_str(), optarg);
-                    exit(1);
+                    verify(false, "VPC tried to exit with error code 1");
                   }
                   params.set(param, val);
                   break;
@@ -1090,7 +1090,7 @@ int processArgs(int argc, char** argv) {
                   int val;
                   if (!parseInt(optarg, val) || (val != 0 && val != 1)) {
                     error_msg(errorstring, "Error reading binary parameter cbc. Given value: %s.\n", optarg);
-                    exit(1);
+                    verify(false, "VPC tried to exit with error code 1");
                   }
                   switch (val) {
                     case 0:
@@ -1110,7 +1110,7 @@ int processArgs(int argc, char** argv) {
                   int val;
                   if (!parseInt(optarg, val) || (val != 0 && val != 1)) {
                     error_msg(errorstring, "Error reading binary parameter cplex. Given value: %s.\n", optarg);
-                    exit(1);
+                    verify(false, "VPC tried to exit with error code 1");
                   }
                   switch (val) {
                     case 0:
@@ -1130,7 +1130,7 @@ int processArgs(int argc, char** argv) {
                   int val;
                   if (!parseInt(optarg, val) || (val != 0 && val != 1)) {
                     error_msg(errorstring, "Error reading binary parameter gurobi. Given value: %s.\n", optarg);
-                    exit(1);
+                    verify(false, "VPC tried to exit with error code 1");
                   }
                   switch (val) {
                     case 0:
@@ -1150,7 +1150,7 @@ int processArgs(int argc, char** argv) {
                   int val;
                   if (!parseInt(optarg, val) || (val != 0 && val != 1)) {
                     error_msg(errorstring, "Error reading binary parameter user_cuts. Given value: %s.\n", optarg);
-                    exit(1);
+                    verify(false, "VPC tried to exit with error code 1");
                   }
                   switch (val) {
                     case 0:
@@ -1168,7 +1168,7 @@ int processArgs(int argc, char** argv) {
                   int val;
                   if (!parseInt(optarg, val) || (val != 0 && val != 1)) {
                     error_msg(errorstring, "Error reading binary parameter use_best_bound. Given value: %s.\n", optarg);
-                    exit(1);
+                    verify(false, "VPC tried to exit with error code 1");
                   }
                   switch (val) {
                     case 0:

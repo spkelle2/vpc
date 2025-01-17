@@ -31,7 +31,7 @@ void createTmpFileCopy(const VPCParameters& params, GRBModel& model, std::string
     } catch (const std::exception &e) {
       error_msg(errorstring, "Could not generate temp file: %s.\n", e.what());
       writeErrorToLog(errorstring, params.logfile);
-      exit(1);
+      verify(false, "VPC tried to exit with error code 1");
     }
   } else {
     // Ensure f_name has proper extension
@@ -303,12 +303,12 @@ class GurobiUserCutCallback : public GRBCallback {
         if (e.getMessage() != "addCut"){
           error_msg(errorstring, "Gurobi: Error during callback: %s\n", e.getMessage().c_str());
           writeErrorToLog(errorstring, params.logfile);
-          exit(1);
+          verify(false, "VPC tried to exit with error code 1");
         }
       } catch (...) {
         error_msg(errorstring, "Gurobi: Error during callback.\n");
         writeErrorToLog(errorstring, params.logfile);
-        exit(1);
+        verify(false, "VPC tried to exit with error code 1");
       }
     } /* callback */
 }; /* class GurobiUserCutCallback */
@@ -348,16 +348,16 @@ void presolveModelWithGurobi(const VPCParameters& params, int strategy,
     } else {
       error_msg(errorstring, "Gurobi: Was not able to solve presolved model to optimality. Status: %d.\n", optimstatus);
       writeErrorToLog(errorstring, params.logfile);
-      exit(1);
+      verify(false, "VPC tried to exit with error code 1");
     }
   } catch (GRBException& e) {
     error_msg(errorstring, "Gurobi: Exception caught: %s\n", e.getMessage().c_str());
     writeErrorToLog(errorstring, params.logfile);
-    exit(1);
+    verify(false, "VPC tried to exit with error code 1");
   } catch (...) {
     error_msg(errorstring, "Gurobi: Unknown exception caught.\n");
     writeErrorToLog(errorstring, params.logfile);
-    exit(1);
+    verify(false, "VPC tried to exit with error code 1");
   }
 } /* presolveModelWithGurobi (GRBModel) */
 
@@ -370,11 +370,11 @@ void presolveModelWithGurobi(const VPCParameters& params, int strategy, const ch
   } catch (GRBException& e) {
     error_msg(errorstring, "Gurobi: Exception caught: %s\n", e.getMessage().c_str());
     writeErrorToLog(errorstring, params.logfile);
-    exit(1);
+    verify(false, "VPC tried to exit with error code 1");
   } catch (...) {
     error_msg(errorstring, "Gurobi: Unknown exception caught.\n");
     writeErrorToLog(errorstring, params.logfile);
-    exit(1);
+    verify(false, "VPC tried to exit with error code 1");
   }
 } /* presolveModelWithGurobi (filename) */
 
@@ -413,7 +413,7 @@ void doBranchAndBoundWithGurobi(const VPCParameters& params, int strategy,
     if (optimstatus == GRB_INFEASIBLE || optimstatus == GRB_UNBOUNDED || optimstatus == GRB_INF_OR_UNBD) {
       error_msg(errorstring, "Gurobi: Failed to optimize MIP.\n");
       writeErrorToLog(errorstring, params.logfile);
-      exit(1);
+      verify(false, "VPC tried to exit with error code 1");
     }
 
     switch (optimstatus) {
@@ -438,7 +438,7 @@ void doBranchAndBoundWithGurobi(const VPCParameters& params, int strategy,
       default: {
         error_msg(errorstring, "Gurobi: Other status after solve: %d.\n", optimstatus);
         writeErrorToLog(errorstring, params.logfile);
-        exit(1);
+        verify(false, "VPC tried to exit with error code 1");
       }
     } // switch optimistatus
     info.iters = (long) model.get(GRB_DoubleAttr_IterCount);
@@ -470,7 +470,7 @@ void doBranchAndBoundWithGurobi(const VPCParameters& params, int strategy,
      if (!isVal(obj, info.obj)) {
        error_msg(errorstring, "Gurobi: %.6e, computed objective value from solution, does not match solver's obj value %.6e.\n", obj, info.obj);
        writeErrorToLog(errorstring, params.logfile);
-       exit(1);
+       verify(false, "VPC tried to exit with error code 1");
      }
    } // save ip solution
 
@@ -487,11 +487,11 @@ void doBranchAndBoundWithGurobi(const VPCParameters& params, int strategy,
   } catch(GRBException& e) {
     error_msg(errorstring, "Gurobi: Exception caught: %s\n", e.getMessage().c_str());
     writeErrorToLog(errorstring, params.logfile);
-    exit(1);
+    verify(false, "VPC tried to exit with error code 1");
   } catch (...) {
     error_msg(errorstring, "Gurobi: Unknown exception caught.\n");
     writeErrorToLog(errorstring, params.logfile);
-    exit(1);
+    verify(false, "VPC tried to exit with error code 1");
   }
 } /* doBranchAndBoundWithGurobi (GRBModel) */
 
@@ -521,7 +521,7 @@ void doBranchAndBoundWithUserCutsGurobi(const VPCParameters& params,
     if (retcode) {
       error_msg(errorstring, "Gurobi: Error updating the model; error code: %d.\n", retcode);
       writeErrorToLog(errorstring, params.logfile);
-      exit(1);
+      verify(false, "VPC tried to exit with error code 1");
     }
     */
 
@@ -559,11 +559,11 @@ void doBranchAndBoundWithUserCutsGurobi(const VPCParameters& params,
   } catch (GRBException& e) {
     error_msg(errorstring, "Gurobi: Exception caught: %s\n", e.getMessage().c_str());
     writeErrorToLog(errorstring, params.logfile);
-    exit(1);
+    verify(false, "VPC tried to exit with error code 1");
   } catch (...) {
     error_msg(errorstring, "Gurobi: Unknown exception caught.\n");
     writeErrorToLog(errorstring, params.logfile);
-    exit(1);
+    verify(false, "VPC tried to exit with error code 1");
   }
 } /* doBranchAndBoundWithUserCutsGurobi (GRBModel) */
 
@@ -584,11 +584,11 @@ void doBranchAndBoundWithGurobi(const VPCParameters& params, int strategy,
   } catch (GRBException& e) {
     error_msg(errorstring, "Gurobi: Exception caught: %s\n", e.getMessage().c_str());
     writeErrorToLog(errorstring, params.logfile);
-    exit(1);
+    verify(false, "VPC tried to exit with error code 1");
   } catch (...) {
     error_msg(errorstring, "Gurobi: Unknown exception caught.\n");
     writeErrorToLog(errorstring, params.logfile);
-    exit(1);
+    verify(false, "VPC tried to exit with error code 1");
   }
 } /* doBranchAndBoundWithGurobi (filename) */
 
@@ -615,11 +615,11 @@ void doBranchAndBoundWithUserCutsGurobi(const VPCParameters& params,
   } catch (GRBException& e) {
     error_msg(errorstring, "Gurobi: Exception caught: %s\n", e.getMessage().c_str());
     writeErrorToLog(errorstring, params.logfile);
-    exit(1);
+    verify(false, "VPC tried to exit with error code 1");
   } catch (...) {
     error_msg(errorstring, "Gurobi: Unknown exception caught.\n");
     writeErrorToLog(errorstring, params.logfile);
-    exit(1);
+    verify(false, "VPC tried to exit with error code 1");
   }
 } /* doBranchAndBoundWithUserCutsGurobi (filename) */
 

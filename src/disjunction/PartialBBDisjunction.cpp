@@ -100,7 +100,7 @@ DisjExitReason PartialBBDisjunction::prepareDisjunction(const OsiSolverInterface
 //  if (!timer) {
 //    error_msg(errorstring, "Timer is not set.\n");
 //    writeErrorToLog(errorstring, params.logfile);
-//    exit(1);
+//    verify(false, "VPC tried to exit with error code 1");
 //  }
   if (this->params.get(intParam::DISJ_TERMS) < 2) {
     return DisjExitReason::NO_DISJUNCTION_EXIT;
@@ -114,7 +114,7 @@ DisjExitReason PartialBBDisjunction::prepareDisjunction(const OsiSolverInterface
     error_msg(errorstring,
         "Unable to clone solver into desired SolverInterface.\n");
     writeErrorToLog(errorstring, params.logfile);
-    exit(1);
+    verify(false, "VPC tried to exit with error code 1");
   }
 
   { // DEBUG DEBUG DEBUG
@@ -141,7 +141,7 @@ DisjExitReason PartialBBDisjunction::prepareDisjunction(const OsiSolverInterface
       error_msg(errorstring,
           "Unable to create branch-and-bound solver into desired SolverInterface.\n");
       writeErrorToLog(errorstring, params.logfile);
-      exit(1);
+      verify(false, "VPC tried to exit with error code 1");
     }
 #endif
   } // DEBUG DEBUG DEBUG
@@ -160,7 +160,7 @@ DisjExitReason PartialBBDisjunction::prepareDisjunction(const OsiSolverInterface
         dynamic_cast<OsiClpSolverInterface*>(BBSolver)->getModelPtr()->moreSpecialOptions() + 256);
   } catch (std::exception& e) {
     std::cerr << "Unable to cast solver as OsiClpSolverInterface." << std::endl;
-    exit(1);
+    verify(false, "VPC tried to exit with error code 1");
   }
 #endif
 
@@ -197,7 +197,7 @@ DisjExitReason PartialBBDisjunction::prepareDisjunction(const OsiSolverInterface
   if (!eventHandler) {
     error_msg(errstr, "Could not get event handler.\n");
     writeErrorToLog(errstr, params.logfile);
-    exit(1);
+    verify(false, "VPC tried to exit with error code 1");
   }
 
 #ifdef TRACE
@@ -226,7 +226,7 @@ DisjExitReason PartialBBDisjunction::prepareDisjunction(const OsiSolverInterface
       // Free
       if (BBSolver && !cbc_model->modelOwnsSolver()) { delete BBSolver; }
       if (cbc_model) { delete cbc_model; }
-      exit(1); // this should only be used during debug and will have memory leaks
+      verify(false, "VPC tried to exit with error code 1"); // this should only be used during debug and will have memory leaks
     }
   }
 #endif
@@ -273,7 +273,7 @@ DisjExitReason PartialBBDisjunction::prepareDisjunction(const OsiSolverInterface
                 num_terms, eventHandler->getNumLeafNodes(), static_cast<int>(terms.size()),
                 eventHandler->isIntegerSolutionFound());
       writeErrorToLog(errstr, params.logfile);
-      exit(1);
+      verify(false, "VPC tried to exit with error code 1");
     }
   } else {
     // exit early if we have a solution because we don't know how to handle it
@@ -290,7 +290,7 @@ DisjExitReason PartialBBDisjunction::prepareDisjunction(const OsiSolverInterface
 } /* prepareDisjunction */
 
 /**
- * @details Create a new disjunction that parameterizes the curren with the given solver.
+ * @details Create a new disjunction that parameterizes the current with the given solver.
  * This updates in each term the optimal basis and objective value, as well as
  * the dual bounds and integer feasible solution in the disjunction.
  *

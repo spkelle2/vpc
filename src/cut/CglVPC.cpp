@@ -252,7 +252,7 @@ void CglVPC::generateCuts(const OsiSolverInterface& si, OsiCuts& cuts, const Cgl
           "accounted for in the cutType and cutHeurVec members.\n",
           init_num_cuts, num_old_cut_type);
       writeErrorToLog(errorstring, params.logfile);
-      exit(1);
+      verify(false, "VPC tried to exit with error code 1");
     }
   }
 
@@ -276,7 +276,7 @@ void CglVPC::generateCuts(const OsiSolverInterface& si, OsiCuts& cuts, const Cgl
       error_msg(errorstring,
           "Mode chosen is CUSTOM but no disjunction is set.\n");
       writeErrorToLog(errorstring, params.logfile);
-      exit(1);
+      verify(false, "VPC tried to exit with error code 1");
     }
     ownsDisjunction = true;
     if (mode == VPCMode::PARTIAL_BB) {
@@ -300,7 +300,7 @@ void CglVPC::generateCuts(const OsiSolverInterface& si, OsiCuts& cuts, const Cgl
           "Mode that is chosen has not yet been implemented for VPC generation: %s.\n",
           VPCModeName[static_cast<int>(mode)].c_str());
       writeErrorToLog(errorstring, params.logfile);
-      exit(1);
+      verify(false, "VPC tried to exit with error code 1");
     }
   } else {
     mode = VPCMode::CUSTOM;
@@ -313,12 +313,12 @@ void CglVPC::generateCuts(const OsiSolverInterface& si, OsiCuts& cuts, const Cgl
   } catch (std::exception& e) {
     error_msg(errorstring, "Unable to cast as SolverInterface.\n");
     writeErrorToLog(errorstring, params.logfile);
-    exit(1);
+    verify(false, "VPC tried to exit with error code 1");
   }
   if (!solver->isProvenOptimal()) {
     error_msg(errorstring, "CglVPC::generateCuts: Solver not proven optimal.\n");
     writeErrorToLog(errorstring, params.logfile);
-    exit(1);
+    verify(false, "VPC tried to exit with error code 1");
   }
 
   // Make sure we are doing a minimization problem; this is just to make later
@@ -612,7 +612,7 @@ void CglVPC::getProblemData(
           (absrhs > 0) ? CoinMin(minReferenceValue, absrhs) : minReferenceValue;
       maxReferenceValue = CoinMax(maxReferenceValue, absrhs);
 
-      // Assign var basic in this row to rowOfVar
+      // Assign var basic in this row to rowOfVar - just mapping this backwards for later use
       const int basic_var = probData.varBasicInRow[row];
       probData.rowOfVar[basic_var] = row;
 
@@ -629,8 +629,8 @@ void CglVPC::getProblemData(
     if (!isBasicVar(solver, var)) {
       // Recall that rowOfVar stores -1 - nb index for nb variables
       // The -1 is to prevent the conflict of the 0th nb var and var basic in row 0
-      probData.rowOfVar[var] -= probData.NBVarIndex.size();
-      probData.NBVarIndex.push_back(var);
+      probData.rowOfVar[var] -= probData.NBVarIndex.size();  // NBVarIndex starts empty
+      probData.NBVarIndex.push_back(var);  // forwards and backwards mapping of nonbasic variables to order amongst themselves
     } else {
       // Quick check that basic slack vars are basic in their row
       const int row = var - numCols;
@@ -644,7 +644,7 @@ void CglVPC::getProblemData(
               "Basic variable in row %d is variable %d, but it should be the slack on this row (%d).\n",
               row, probData.varBasicInRow[row], var);
           writeErrorToLog(errstr, params.logfile);
-          exit(1);
+          verify(false, "VPC tried to exit with error code 1");
         }
       }
     }
@@ -656,7 +656,7 @@ void CglVPC::getProblemData(
   const int numNB = probData.NBVarIndex.size();
   int tempIndex = 0;
   probData.NBReducedCost.resize(numNB);
-  for (int j = 0; j < numNB; j++) {
+  for (int j = 0; j < numNB; j++) {  // iterate over nonbasic variables and get their reduced costs
     const int NBVar = probData.NBVarIndex[j];
 
     if (NBVar < numCols) {
@@ -678,7 +678,7 @@ void CglVPC::getProblemData(
             "However, for nb var %d (real var %d), it is %e.\n",
             j, NBVar, probData.NBReducedCost[j]);
         writeErrorToLog(errorstring, params.logfile);
-        exit(1);
+        verify(false, "VPC tried to exit with error code 1");
       } else {
         warning_msg(warnstring,
             "Nonbasic reduced cost should be >= 0 in the complemented nonbasic space. "
@@ -754,7 +754,7 @@ CglVPC::ExitReason CglVPC::setupConstraints(OsiSolverInterface* const vpcsolver,
       error_msg(errorstring,
           "CglVPC::setupConstraints: Solver not proven optimal after updating bounds from root node.\n");
       writeErrorToLog(errorstring, params.logfile);
-      exit(1);
+      verify(false, "VPC tried to exit with error code 1");
     }
 
     // For debugging purposes, verify that the stored root objective matches
@@ -788,7 +788,7 @@ CglVPC::ExitReason CglVPC::setupConstraints(OsiSolverInterface* const vpcsolver,
               "CglVPC::setupConstraints: Root objective calculated after bound changes (%f) does not match stored value in disjunction (%f), with a difference of %e.\n",
             vpcsolver->getObjValue(), this->disjunction->root_obj, std::abs(this->disjunction->root_obj - vpcsolver->getObjValue()));
           writeErrorToLog(errorstring, params.logfile);
-          exit(1);
+          verify(false, "VPC tried to exit with error code 1");
         } else {
           warning_msg(warnstring,
               "CglVPC::setupConstraints: Root objective calculated after bound changes (%f) does not match stored value in disjunction (%f), with a difference of %e.\n",
@@ -899,7 +899,8 @@ CglVPC::ExitReason CglVPC::setupConstraints(OsiSolverInterface* const vpcsolver,
   for (int tmp_ind = 0; tmp_ind < num_normal_terms; tmp_ind++) {
     DisjunctiveTerm* term = &(this->disjunction->terms[tmp_ind]);
     terms_added++;
-
+    // don't worry about infeasible terms for recycled disjunction because we reprocess feasibility below
+    // todo update this to skipping infeasible terms only if we're just running in aleks' mode
     if (!term->is_feasible && !params.get(intParam::RECYCLED_DISJUNCTION)) {
       continue;
     }
@@ -938,14 +939,48 @@ CglVPC::ExitReason CglVPC::setupConstraints(OsiSolverInterface* const vpcsolver,
           "CglVPC::setupConstraints: Warm start information not accepted for term %d/%d.\n",
           tmp_ind + 1, num_normal_terms);
       writeErrorToLog(errorstring, params.logfile);
-      exit(1);
+      verify(false, "VPC tried to exit with error code 1");
     }
 
     // Resolve and check the objective matches
     // taking this off trace only because I need it for tracking number of terms in current release
     printf("\n## CglVPC::setupConstraints: Solving for term %d/%d. ##\n",
         tmp_ind + 1, num_normal_terms);
-    termSolver->resolve();
+
+    // todo: pick back up here for tracking basis
+//    // get a clone of the basis to make sure the solve doesn't change it
+//    CoinWarmStartBasis* basis = dynamic_cast<CoinWarmStartBasis*>(term->basis->clone());
+//
+//    // track change in iterations to see if we're reusing the basis properly
+//    int pre_iters = termSolver->getIterationCount();
+//    termSolver->resolve();
+//    int post_iters = termSolver->getIterationCount();
+//    printf("CglVPC::setupConstraints: Iterations: %d -> %d.\n", pre_iters, post_iters);
+//
+//    // check to see if warm start objects are the same and if they match the final basis
+//    CoinWarmStartBasis* new_basis = dynamic_cast<CoinWarmStartBasis*>(termSolver->getWarmStart());
+//    for (int i = 0; i < termSolver->getNumRows(); i++) {
+//      if (basis->getArtifStatus(i) != new_basis->getArtifStatus(i)) {
+//        printf("warm compare Row %d: %d vs %d\n", i, basis->getArtifStatus(i), new_basis->getArtifStatus(i));
+//      }
+//    }
+//    for (int i = 0; i < termSolver->getNumCols(); i++) {
+//      if (basis->getStructStatus(i) != new_basis->getStructStatus(i)) {
+//        printf("warm compare Col %d: %d vs %d\n", i, basis->getStructStatus(i), new_basis->getStructStatus(i));
+//      }
+//    }
+//    // Check statuses against the warm start basis
+//    for (int i = 0; i < termSolver->getNumRows(); i++) {
+//      if (isBasicVar(termSolver, i + termSolver->getNumCols()) != (basis->getArtifStatus(i) == 1)){
+//        printf("warm status conflict Row %d: %d\n", i, basis->getArtifStatus(i));
+//      }
+//    }
+//    for (int i = 0; i < termSolver->getNumCols(); i++) {
+//      if (isBasicVar(termSolver, i) != (basis->getStructStatus(i) == 1)){
+//        printf("warm status conflict Col %d: %d\n", i, basis->getStructStatus(i));
+//      }
+//      printf("Col %d status, value: %d, %.2f\n", i, basis->getStructStatus(i), termSolver->getColSolution()[i]);
+//    }
     term->is_feasible = checkSolverOptimality(termSolver, true);
     //enableFactorization(termSolver, params.get(doubleParam::EPS)); // this may change the solution slightly
 
@@ -985,7 +1020,7 @@ CglVPC::ExitReason CglVPC::setupConstraints(OsiSolverInterface* const vpcsolver,
               tmp_ind, num_normal_terms, stringValue(term->obj, "%1.3f").c_str(),
               stringValue(termSolver->getObjValue(), "%1.3f").c_str());
           writeErrorToLog(errorstring, params.logfile);
-          exit(1);
+          verify(false, "VPC tried to exit with error code 1");
         } else {
           warning_msg(warnstring,
               "CglVPC::setupConstraints: Objective at disjunctive term %d/%d is incorrect. Before, it was %s, now it is %s.\n",
@@ -1011,7 +1046,7 @@ CglVPC::ExitReason CglVPC::setupConstraints(OsiSolverInterface* const vpcsolver,
       termSolver->resolve();
       term->is_feasible = checkSolverOptimality(termSolver, true);
     }
-    if (term->is_feasible) {
+    if (term->is_feasible) {  // todo: add "or if we're including infeasible terms"
       // Update disjunctive bound info
       // This is here rather than in the Disjunction class,
       // because it is unclear whether, in that class,
@@ -1026,7 +1061,7 @@ CglVPC::ExitReason CglVPC::setupConstraints(OsiSolverInterface* const vpcsolver,
         timer.start_timer(CglVPC::time_T1 + std::to_string(terms_added));
 
         // Get cobasis information and PR collection
-        enableFactorization(termSolver, probData.EPS);
+        enableFactorization(termSolver, probData.EPS);  // todo: check if this is a problem because it changes solution
         ProblemData tmpData;
         getProblemData(termSolver, tmpData, &probData, false);
         genDepth1PRCollection(vpcsolver, termSolver,
@@ -1090,7 +1125,7 @@ CglVPC::ExitReason CglVPC::setupConstraints(OsiSolverInterface* const vpcsolver,
 //        // Both sides infeasible, which means the problem is infeasible; error
 //        error_msg(errorstring, "Both sides of root split variable (index %d, value %g) are infeasible, which would imply the instance is infeasible.\n", var, val);
 //        writeErrorToLog(errorstring, params.logfile);
-//        exit(1);
+//        verify(false, "VPC tried to exit with error code 1");
 //      }
 //    }
 //  } // check tilted objective cut validity
@@ -1115,7 +1150,7 @@ void CglVPC::genDepth1PRCollection(const OsiSolverInterface* const vpcsolver,
   if (!tmpSolver->isProvenOptimal()) {
     error_msg(errstr, "Solver is not proven optimal.\n");
     writeErrorToLog(errstr, params.logfile);
-    exit(1);
+    verify(false, "VPC tried to exit with error code 1");
   }
 
   /***********************************************************************************
@@ -1137,7 +1172,7 @@ void CglVPC::genDepth1PRCollection(const OsiSolverInterface* const vpcsolver,
         stringValue(curr_nb_obj_val).c_str(),
         stringValue(tmpSolver->getObjValue() - origProbData.lp_opt).c_str());
     writeErrorToLog(errorstring, params.logfile);
-    exit(1);
+    verify(false, "VPC tried to exit with error code 1");
   }
   const double beta = params.get(PRLP_FLIP_BETA) >= 0 ? 1.0 : -1.0;
   if (beta > 0 && !isZero(curr_nb_obj_val)) { // check things are still okay after we scale; only applies when beta > 0, as otherwise the obj cut is not valid
@@ -1151,7 +1186,7 @@ void CglVPC::genDepth1PRCollection(const OsiSolverInterface* const vpcsolver,
             "Term %d (point) does not satisfy the objective cut. Activity: %.8f. RHS: %.8f\n",
             term_ind, activity, beta);
         writeErrorToLog(errorstring, params.logfile);
-        exit(1);
+        verify(false, "VPC tried to exit with error code 1");
       } else {
         warning_msg(warnstring,
             "Term %d (point) does not satisfy the objective cut. Activity: %.8f. RHS: %.8f. Small enough violation that we only send a warning.\n",
@@ -1229,7 +1264,7 @@ void CglVPC::genDepth1PRCollection(const OsiSolverInterface* const vpcsolver,
           stringValue(calcRedCost).c_str(),
           stringValue(curr_nb_obj_val).c_str());
       writeErrorToLog(errorstring, params.logfile);
-      exit(1);
+      verify(false, "VPC tried to exit with error code 1");
     }
     if (lessThanVal(calcRedCost, 0., params.get(EPS))) {
       numFails[static_cast<int>(FailureType::NUMERICAL_ISSUES_WARNING)]++;
@@ -1239,7 +1274,7 @@ void CglVPC::genDepth1PRCollection(const OsiSolverInterface* const vpcsolver,
             "Term %d ray %d does not satisfy the objective cut. Activity: %.8f. RHS: %.8f\n",
             term_ind, ray_ind, calcRedCost, 0.);
         writeErrorToLog(errorstring, params.logfile);
-        exit(1);
+        verify(false, "VPC tried to exit with error code 1");
       } else {
         warning_msg(warnstring,
             "Term %d ray %d does not satisfy the objective cut. Activity: %.8f. RHS: %.8f. Small enough violation that we only send a warning.\n",
@@ -1359,7 +1394,7 @@ CglVPC::ExitReason CglVPC::tryObjectives(OsiCuts& cuts,
     error_msg(errorstring,
         "Currently, flipping beta is not implemented. Need to check that within setup, we can correctly switch the rhs.\n");
     writeErrorToLog(errorstring, params.logfile);
-    exit(1);
+    verify(false, "VPC tried to exit with error code 1");
   }
 
 #ifdef TRACE
@@ -1374,7 +1409,7 @@ CglVPC::ExitReason CglVPC::tryObjectives(OsiCuts& cuts,
         "num_obj_tried (%d) not equal to num_cuts (%d) + num_failures (%d)\n",
         num_obj_tried - init_num_obj, num_cuts - init_num_cuts, num_failures - init_num_failures);
     writeErrorToLog(errorstring, params.logfile);
-    exit(1);
+    verify(false, "VPC tried to exit with error code 1");
   }
 
   return status;

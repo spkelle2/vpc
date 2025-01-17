@@ -371,7 +371,7 @@ std::vector<int> findIndicesOfDifference(std::vector<int> child_var, std::vector
                                          std::vector<double> child_value, std::vector<double> parent_value);
 
 /// @brief Return message if condition is not true
-void verify(bool condition, const std::string& msg);
+void verify(bool condition, const std::string& msg = "", bool catchable = true);
 
 /// @brief add a variable bound to the solver
 void addVarBound(OsiSolverInterface* solver, const int col, const int bound, const double val);

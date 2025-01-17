@@ -49,7 +49,7 @@ void setNodeStatistics(NodeStatistics& stats, const CbcNode* const node,
   if (!branch) {
     error_msg(errorstring, "Expected branch to not be NULL in setNodeStatistics.\n");
     //writeErrorToLog(errorstring, owner->params.logfile);
-    exit(1);
+    verify(false, "VPC tried to exit with error code 1");
   }
   stats.branch_index = branch->branchIndex();
   const OsiTwoWayBranchingObject* osi_branch = dynamic_cast<const OsiTwoWayBranchingObject*>(branch);
@@ -102,7 +102,7 @@ void setNodeStatistics(NodeStatistics& stats, const CbcNode* const node,
     if (prev_stat_id < 0) {
       error_msg(errorstring, "Branch index is 1 but node has no previous number.\n");
       //writeErrorToLog(errorstring, owner->params.logfile);
-      exit(1);
+      verify(false, "VPC tried to exit with error code 1");
     }
     /*
     if (prev_stat_id < 0) { // I don't think we ever get here...
@@ -128,7 +128,7 @@ void setNodeStatistics(NodeStatistics& stats, const CbcNode* const node,
   stats.found_integer_solution = solution_is_found;
 
   if (!stats_vec.empty()) {
-    assert(stats.id == stats_vec[stats_vec.size()-1].id + 1);
+    verify(stats.id == stats_vec[stats_vec.size()-1].id + 1);
   }
 
   stats.status = "normal";
@@ -514,7 +514,7 @@ VPCEventHandler::event(CbcEvent whichEvent) {
             break;
           }
         }
-        assert (i < numNodesOnTree_); // make sure we found it
+        verify (i < numNodesOnTree_); // make sure we found it
 
         // Now adjust the stats (need to set variable, branch_index, way, obj, value, lb, ub, bounds)
         stats.obj = currentNodes_[i]->objectiveValue();
@@ -524,7 +524,7 @@ VPCEventHandler::event(CbcEvent whichEvent) {
 
         // I think this situation is only going to happen on the Cbc side of things
         const CbcBranchingObject* cbc_branch = dynamic_cast<const CbcBranchingObject*>(branch);
-        assert(cbc_branch != NULL);
+        verify(cbc_branch != NULL);
         stats.way = currentNodes_[i]->way(); // if it were the Osi side, way would not be set this way
         stats.variable = cbc_branch->variable();
 
@@ -543,7 +543,7 @@ VPCEventHandler::event(CbcEvent whichEvent) {
           } else {
             error_msg(errorstring, "Cannot access original object.\n");
             writeErrorToLog(errorstring, owner->params.logfile);
-            exit(1);
+            verify(false, "VPC tried to exit with error code 1");
           }
         }
         stats.lb = (stats.way > 0) ? std::ceil(branch->value()) : prevLB;
@@ -581,7 +581,7 @@ VPCEventHandler::event(CbcEvent whichEvent) {
     if (model_->solver()->isProvenDualInfeasible()) {
       error_msg(errorstring, "Did not think that dual infeasibility in the model solver could happen. Check this.\n");
       writeErrorToLog(errorstring, owner->params.logfile);
-      exit(1);
+      verify(false, "VPC tried to exit with error code 1");
     }
 #endif
     // When a solution is found, newNode is not null, but it has no branching object
@@ -605,7 +605,7 @@ VPCEventHandler::event(CbcEvent whichEvent) {
             model_->getNodeCount(), model_->getNodeCount2(),
             (child_->nodeInfo()->parent() ? child_->nodeInfo()->parent()->nodeNumber() : -1));
         writeErrorToLog(errorstring, owner->params.logfile);
-        exit(1);
+        verify(false, "VPC tried to exit with error code 1");
       }
       NodeStatistics currNodeStats;
       // set node stats for child
@@ -656,7 +656,7 @@ VPCEventHandler::event(CbcEvent whichEvent) {
           // We found the parent
           parentInfo_ = currentNodes_[i]->nodeInfo();
 #ifdef CBC_VERSION_210PLUS
-          assert(parentInfo_ == model_->parentNode()->nodeInfo());
+          verify(parentInfo_ == model_->parentNode()->nodeInfo());
 #endif
           break;
         }
@@ -666,7 +666,7 @@ VPCEventHandler::event(CbcEvent whichEvent) {
       if (!parentInfo_) {
         error_msg(errorstring, "Could not find parent node.\n");
         writeErrorToLog(errorstring, owner->params.logfile);
-        exit(1);
+        verify(false, "VPC tried to exit with error code 1");
       }
 #endif
 
@@ -676,7 +676,7 @@ VPCEventHandler::event(CbcEvent whichEvent) {
       if (solver_feasible && !solution_found && (pruneNode_ == PruneNodeOption::NO) && child_ && child_->active() && child_->branchingObject()) {
         error_msg(errorstring, "We should not get here, I think. Is it an integer-feasible solution? If so, it should be saved.\n");
         writeErrorToLog(errorstring, owner->params.logfile);
-        exit(1);
+        verify(false, "VPC tried to exit with error code 1");
       }
 
       // When !solver_feasible, this may be because it is actually integer-feasible
@@ -763,7 +763,7 @@ VPCEventHandler::event(CbcEvent whichEvent) {
           if (!isVal(activity, ref_activity)) {
             error_msg(errorstring, "Error calculating activity. Activity: %f. Reference activity: %f.\n", activity, ref_activity);
             writeErrorToLog(errorstring, owner->params.logfile);
-            exit(1);
+            verify(false, "VPC tried to exit with error code 1");
           }
           double rhs = model_->solver()->getRightHandSide()[row_ind];
           violation = std::abs(rhs - activity);
@@ -802,7 +802,7 @@ VPCEventHandler::event(CbcEvent whichEvent) {
         if (error >= 0) {
           error_msg(errorstring, "An integer-feasible solution was supposedly found, but it is infeasible somehow. Variable: %d. Violation: %f.\n", error, violation);
           writeErrorToLog(errorstring, owner->params.logfile);
-          exit(1);
+          verify(false, "VPC tried to exit with error code 1");
         }
 
         // Save the integer feasible solution if it cannot pruned by bound
@@ -813,7 +813,7 @@ VPCEventHandler::event(CbcEvent whichEvent) {
         if (pruneNode_ == PruneNodeOption::PRUNE_BY_INTEGRALITY && !isVal(objectiveValue, model_->getObjValue())) {
           error_msg(errorstring, "We are assuming that if pruning by integrality, the objective we calculated should be the same as the objective of the solver.\n");
           writeErrorToLog(errorstring, owner->params.logfile);
-          exit(1);
+          verify(false, "VPC tried to exit with error code 1");
         }
         // Code below is wrong, I think (2020-07-21)
         //if (pruneNode_ == PruneNodeOption::PRUNE_BY_INTEGRALITY || (!greaterThanVal(objectiveValue, model_->getCutoff() + model_->getCutoffIncrement()))) {
@@ -834,7 +834,7 @@ VPCEventHandler::event(CbcEvent whichEvent) {
         // The owner is the first node in this case, but I am not sure how to get to it
         error_msg(errorstring, "Owner CbcNode of parentInfo_ not found!\n");
         writeErrorToLog(errorstring, owner->params.logfile);
-        exit(1);
+        verify(false, "VPC tried to exit with error code 1");
       }
 
       // If no solution was found, then we are pruning by bound or by infeasibility
@@ -895,7 +895,7 @@ VPCEventHandler::event(CbcEvent whichEvent) {
           "child_ reference should not be NULL within beforeSolution2. model_->getNodeCount2() = %d.\n",
           model_->getNodeCount2());
       writeErrorToLog(errorstring, owner->params.logfile);
-      exit(1);
+      verify(false, "VPC tried to exit with error code 1");
     }
 
     double objectiveValue = model_->savedSolutionObjective(0); // eventHandler replaces bestObjective_ temporarily, so we are accessing the solution's objective here
@@ -968,7 +968,7 @@ VPCEventHandler::event(CbcEvent whichEvent) {
         if (!parent_node) {
           error_msg(errorstring, "Owner CbcNode of child_ not found!\n");
           writeErrorToLog(errorstring, owner->params.logfile);
-          exit(1);
+          verify(false, "VPC tried to exit with error code 1");
         }
         setPrunedNodeStatistics(prunedNodeStats, parent_node, model_,
             true, originalLB_, originalUB_, objectiveValue, foundSolution_);
@@ -1033,7 +1033,7 @@ VPCEventHandler::event(CbcEvent whichEvent) {
       numLeafNodes_ = 0;
     } /* difficulties so run was abandoned */
     else {
-      assert(model_->status() == 0);
+      verify(model_->status() == 0);
       numNodesOnTree_ = 0;
       numLeafNodes_ = 0;
     }
@@ -1055,7 +1055,7 @@ SolverInterface* VPCEventHandler::setOriginalSolver(
   } catch (std::exception& e) {
     error_msg(errorstring, "Unable to clone solver as SolverInterface.\n");
     writeErrorToLog(errorstring, owner->params.logfile);
-    exit(1);
+    verify(false, "VPC tried to exit with error code 1");
   }
   this->setOriginalLB(originalSolver_->getNumCols(), originalSolver_->getColLower());
   this->setOriginalUB(originalSolver_->getNumCols(), originalSolver_->getColUpper());
@@ -1661,6 +1661,67 @@ bool VPCEventHandler::setupDisjunctiveTerm(
   term.changed_var.push_back(branching_variable);
   term.changed_bound.push_back(branching_bound);
   term.changed_value.push_back(branching_value);
+
+  // if the term was infeasible, get a likely basis for when it becomes feasible
+//  if (!term.is_feasible){
+//    verify(branching_variable >= 0, "A disjunctive term becomes infeasible from branching.");
+//    verify(tmpSolverParent->getObjSense() == 1, "Solver must be a minimization problem.");
+//
+//    // Copy the parent solver and set the objective to minimize/maximize the
+//    // branching variable to find closest basic solution to feasibility
+//    SolverInterface* tmpFeasibleSolver =
+//        dynamic_cast<SolverInterface*>(tmpSolverParent->clone());
+//    if (branching_bound == 0){
+//      // if the node became infeasible when adding x_i >= u,
+//      // maximize x_i to find basis closest to being feasible
+//      for (int i = 0; i < tmpFeasibleSolver->getNumCols(); i++){
+//        double objCoef = i == branching_variable ? -1 : 0;
+//        tmpFeasibleSolver->setObjCoeff(i, objCoef);
+//      }
+//    } else {
+//      // if the node became infeasible when adding x_i <= l,
+//      // minimize x_i to find basis closest to being feasible
+//      for (int i = 0; i < tmpFeasibleSolver->getNumCols(); i++){
+//        double objCoef = i == branching_variable ? 1 : 0;
+//        tmpFeasibleSolver->setObjCoeff(i, objCoef);
+//      }
+//    }
+//    // solve to find how much we can tighten x_i while remaining feasible
+//    enableFactorization(tmpFeasibleSolver, owner->params.get(doubleParam::EPS));
+//    tmpFeasibleSolver->resolve();
+//    verify(checkSolverOptimality(tmpFeasibleSolver, true), "Parent node should be feasible.");
+//    double relaxed_branching_value = tmpFeasibleSolver->getColSolution()[branching_variable];
+//
+//    // reset the objective coefficients to their original values
+//    for (int i = 0; i < tmpFeasibleSolver->getNumCols(); i++){
+//      tmpFeasibleSolver->setObjCoeff(i, tmpSolverParent->getObjCoefficients()[i]);
+//    }
+//
+//    // now add the branching constraint with the relaxed bound buffering by
+//    // epsilon to reduce likelihood of degeneracy which could lead to getting a
+//    // basis cone oriented the wrong direction and making PRLP infeasible
+//    if (branching_bound == 0){
+//      // add relaxed branching constraint x_i >= u' - eps
+//      addVarBound(tmpFeasibleSolver, branching_variable, branching_bound,
+//                  relaxed_branching_value - owner->params.get(doubleParam::EPS));
+//    } else {
+//      // add relaxed branching constraint x_i <= l' + eps
+//      addVarBound(tmpFeasibleSolver, branching_variable, branching_bound,
+//                  relaxed_branching_value + owner->params.get(doubleParam::EPS));
+//    }
+//
+//    // resolve the solver to get the basis
+//    tmpFeasibleSolver->resolve();
+//    CoinWarmStartBasis* new_basis =
+//        dynamic_cast<CoinWarmStartBasis*>(tmpSolverNode->getWarmStart());
+//    // term.basis = dynamic_cast<CoinWarmStartBasis*>(tmpFeasibleSolver->getWarmStart());
+//
+//    // todo warn if the basis didn't change - it's not wrong it just won't be effective
+//    // todo warn if branching constraint not in basis
+//    // std::cout << "Hello" << std::endl;
+//    // delete the solver
+//    delete tmpFeasibleSolver;
+//  }
 
   // add the term
   owner->terms.push_back(term);

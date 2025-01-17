@@ -199,7 +199,7 @@ void Disjunction::getSolverForTerm(
     error_msg(errorstring,
         "Warm start information not accepted for term %d/%d.\n", term_ind+1, this->num_terms);
     writeErrorToLog(errorstring, logfile);
-    exit(1);
+    verify(false, "VPC tried to exit with error code 1");
   }
 
   // Resolve and check the objective matches - //todo I think I can reduce the number of flags here

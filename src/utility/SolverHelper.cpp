@@ -20,7 +20,7 @@ void initializeSolver(
         "Unable to parse filename: %s. Found: dir=\"%s\", instname=\"%s\",ext=\"%s\".\n",
         FILENAME.c_str(), dir.c_str(),
         instname.c_str(), in_file_ext.c_str());
-    exit(1);
+    verify(false, "VPC tried to exit with error code 1");
   }
 
   int status = 0;
@@ -45,7 +45,7 @@ void initializeSolver(
         error_msg(errorstring, "Unrecognized extension: %s.\n",
             in_file_ext.c_str());
         writeErrorToLog(errorstring, logfile);
-        exit(1);
+        verify(false, "VPC tried to exit with error code 1");
       }
     }
   } // read file
@@ -53,7 +53,7 @@ void initializeSolver(
     error_msg(errorstring, "Unable to read in file %s.\n",
         FILENAME.c_str());
     writeErrorToLog(errorstring, logfile);
-    exit(1);
+    verify(false, "VPC tried to exit with error code 1");
   }
 
   // Make sure we are doing a minimization problem; this is just to make later
@@ -165,7 +165,7 @@ void setupClpForCbc(OsiSolverInterface* const solver,
         dynamic_cast<OsiClpSolverInterface*>(solver)->getModelPtr()->moreSpecialOptions() + 256);
   } catch (std::exception& e) {
     std::cerr << "Unable to cast solver as OsiClpSolverInterface." << std::endl;
-    exit(1);
+    verify(false, "VPC tried to exit with error code 1");
   }
 } /* setupClpForCbc */
 #endif // USE_CLP
@@ -447,7 +447,7 @@ bool checkSolverOptimality(OsiSolverInterface* const solver,
       if (exitOnDualInfeas) {
         error_msg(errstr,
             "Solver is dual infeasible. Check why this happened!\n");
-        exit(1);
+        verify(false, "VPC tried to exit with error code 1");
       } else {
         return false;
       }
@@ -578,7 +578,7 @@ double applyCutsCustom(OsiSolverInterface* const solver, const OsiCuts& cs,
     std::string infeas_f_name = "infeasible_lp";
     solver->writeMps(infeas_f_name.c_str(), "mps", 1);
 #endif
-    exit(1);
+    verify(false, "VPC tried to exit with error code 1");
   }
 
   // Sometimes there are slight inaccuracies at the end that we can get rid of

@@ -89,18 +89,18 @@ void runBBTests(
   printf("\n## Performing branch-and-bound tests. ##\n");
 
   if (branch_with_no_cuts) {
-    assert(info_nocuts != NULL);
+    verify(info_nocuts != NULL);
     info_nocuts->vec_bb_info.resize(0);
     info_nocuts->vec_bb_info.resize(num_bb_runs);
   }
   if (branch_with_vpcs) {
-    assert(info_mycuts != NULL);
+    verify(info_mycuts != NULL);
     info_mycuts->vec_bb_info.resize(0);
     info_mycuts->num_cuts = num_vpcs;
     info_mycuts->vec_bb_info.resize(num_bb_runs);
   }
   if (branch_with_gmics) {
-    assert(info_allcuts != NULL);
+    verify(info_allcuts != NULL);
     info_allcuts->num_cuts = num_vpcs + num_gmics;
     info_allcuts->vec_bb_info.resize(num_bb_runs);
   }
@@ -208,7 +208,7 @@ void runBBTests(
         if (!ip_solution || ip_solution->empty()) {
           error_msg(errorstring, "Unable to obain IP solution.\n");
           writeErrorToLog(errorstring, params.logfile);
-          exit(1);
+          verify(false, "VPC tried to exit with error code 1");
         }
 
         // Check cuts
@@ -416,7 +416,7 @@ void createTmpFileCopy(
     } catch (const std::exception &e) {
       error_msg(errorstring, "Could not generate temp file: %s.\n", e.what());
       writeErrorToLog(errorstring, params.logfile);
-      exit(1);
+      verify(false, "VPC tried to exit with error code 1");
     }
   }
 
