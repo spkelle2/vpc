@@ -946,6 +946,7 @@ CglVPC::ExitReason CglVPC::setupConstraints(OsiSolverInterface* const vpcsolver,
     // taking this off trace only because I need it for tracking number of terms in current release
     printf("\n## CglVPC::setupConstraints: Solving for term %d/%d. ##\n",
         tmp_ind + 1, num_normal_terms);
+    termSolver->resolve();
 
     // todo: pick back up here for tracking basis
 //    // get a clone of the basis to make sure the solve doesn't change it
