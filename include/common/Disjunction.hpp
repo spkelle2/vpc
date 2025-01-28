@@ -42,7 +42,8 @@ public:
   std::string type; ///< whether the term was pruned, a compliment to tightening, or a leaf
   std::string name; ///< written out form of the disjunctive constraint applied to this term
 #ifdef USE_COIN
-  CoinWarmStart* basis = NULL; ///< optional: saved basis for this term (to enable quick warm start)
+  CoinWarmStart* basis = NULL; ///< optional: saved basis for this term with disjunctive constraints added as tightened bounds (to enable quick warm start)
+  CoinWarmStart* basis_extended = NULL; ///< optional: saved basis for this term with disjunctive constraints added as constraints (to enable quick warm start)
   std::vector<OsiRowCut> ineqs; ///< optional: inequalities to add aside from changed bounds
 #endif
 

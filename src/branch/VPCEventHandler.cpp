@@ -1622,7 +1622,7 @@ bool VPCEventHandler::setupDisjunctiveTerm(
     const SolverInterface* const tmpSolverParent, const std::vector<int>& term_var,
     const std::vector<int>& term_bound, const std::vector<double>& term_val,
     const int branching_variable, const int branching_bound, const double branching_value,
-    const std::string& term_type, const int orig_node_id) {
+    const std::string& term_type, const SolverInterface* const tmpSolverRoot, const int orig_node_id) {
 
   // we assume tmpSolverParent already has the term_ variable bounds applied
   checkBounds(tmpSolverParent, term_var, term_bound, term_val);
@@ -1662,72 +1662,20 @@ bool VPCEventHandler::setupDisjunctiveTerm(
   term.changed_bound.push_back(branching_bound);
   term.changed_value.push_back(branching_value);
 
-  // if the term was infeasible, get a likely basis for when it becomes feasible
-//  if (!term.is_feasible){
-//    verify(branching_variable >= 0, "A disjunctive term becomes infeasible from branching.");
-//    verify(tmpSolverParent->getObjSense() == 1, "Solver must be a minimization problem.");
-//
-//    // Copy the parent solver and set the objective to minimize/maximize the
-//    // branching variable to find closest basic solution to feasibility
-//    SolverInterface* tmpFeasibleSolver =
-//        dynamic_cast<SolverInterface*>(tmpSolverParent->clone());
-//    if (branching_bound == 0){
-//      // if the node became infeasible when adding x_i >= u,
-//      // maximize x_i to find basis closest to being feasible
-//      for (int i = 0; i < tmpFeasibleSolver->getNumCols(); i++){
-//        double objCoef = i == branching_variable ? -1 : 0;
-//        tmpFeasibleSolver->setObjCoeff(i, objCoef);
-//      }
-//    } else {
-//      // if the node became infeasible when adding x_i <= l,
-//      // minimize x_i to find basis closest to being feasible
-//      for (int i = 0; i < tmpFeasibleSolver->getNumCols(); i++){
-//        double objCoef = i == branching_variable ? 1 : 0;
-//        tmpFeasibleSolver->setObjCoeff(i, objCoef);
-//      }
-//    }
-//    // solve to find how much we can tighten x_i while remaining feasible
-//    enableFactorization(tmpFeasibleSolver, owner->params.get(doubleParam::EPS));
-//    tmpFeasibleSolver->resolve();
-//    verify(checkSolverOptimality(tmpFeasibleSolver, true), "Parent node should be feasible.");
-//    double relaxed_branching_value = tmpFeasibleSolver->getColSolution()[branching_variable];
-//
-//    // reset the objective coefficients to their original values
-//    for (int i = 0; i < tmpFeasibleSolver->getNumCols(); i++){
-//      tmpFeasibleSolver->setObjCoeff(i, tmpSolverParent->getObjCoefficients()[i]);
-//    }
-//
-//    // now add the branching constraint with the relaxed bound buffering by
-//    // epsilon to reduce likelihood of degeneracy which could lead to getting a
-//    // basis cone oriented the wrong direction and making PRLP infeasible
-//    if (branching_bound == 0){
-//      // add relaxed branching constraint x_i >= u' - eps
-//      addVarBound(tmpFeasibleSolver, branching_variable, branching_bound,
-//                  relaxed_branching_value - owner->params.get(doubleParam::EPS));
-//    } else {
-//      // add relaxed branching constraint x_i <= l' + eps
-//      addVarBound(tmpFeasibleSolver, branching_variable, branching_bound,
-//                  relaxed_branching_value + owner->params.get(doubleParam::EPS));
-//    }
-//
-//    // resolve the solver to get the basis
-//    tmpFeasibleSolver->resolve();
-//    CoinWarmStartBasis* new_basis =
-//        dynamic_cast<CoinWarmStartBasis*>(tmpSolverNode->getWarmStart());
-//    // term.basis = dynamic_cast<CoinWarmStartBasis*>(tmpFeasibleSolver->getWarmStart());
-//
-//    // todo warn if the basis didn't change - it's not wrong it just won't be effective
-//    // todo warn if branching constraint not in basis
-//    // std::cout << "Hello" << std::endl;
-//    // delete the solver
-//    delete tmpFeasibleSolver;
-//  }
-
   // add the term
   owner->terms.push_back(term);
 
-  // delete the solver
+  // get the basis for the extended solver (i.e. when adding disjunctive constraints
+  // as constraints and not tightened variable bounds)
+  OsiSolverInterface* tmpSolverNodeExtended =
+      dynamic_cast<OsiSolverInterface*>(tmpSolverRoot->clone());
+  owner->getSolverForTerm(tmpSolverNodeExtended, owner->terms.size() - 1,
+                          tmpSolverRoot, false, .001, NULL, false);
+  term.basis_extended = dynamic_cast<CoinWarmStartBasis*>(tmpSolverNodeExtended->getWarmStart());
+
+  // delete the solvers
   delete tmpSolverNode;
+  delete tmpSolverNodeExtended;
 
   if (term.type == "leaf"){
     if (term.is_feasible){
@@ -1766,14 +1714,16 @@ bool VPCEventHandler::setupDisjunctiveTerm(
 void VPCEventHandler::createStrongBranchingTerms(
     std::vector<int> child_exclusive_var, std::vector<int> child_exclusive_bound,
     std::vector<double> child_exclusive_val, const SolverInterface* const tmpSolver,
-    std::vector<int> parent_var, std::vector<int> parent_bound,
-    std::vector<double> parent_val){
+    const SolverInterface* const tmpSolverRoot, std::vector<int> parent_var,
+    std::vector<int> parent_bound, std::vector<double> parent_val){
 
   // we assume tmpSolver already has the parent_ variable bounds applied
   checkBounds(tmpSolver, parent_var, parent_bound, parent_val);
   // we assume tmpSolver should not have any of the bounds exclusive to the child node applied
   checkBounds(tmpSolver, child_exclusive_var, child_exclusive_bound,
               child_exclusive_val, false);
+  // we assume tmpSolverRoot should not have any of the tightened bounds on the parent node applied
+  checkBounds(tmpSolverRoot, parent_var, parent_bound, parent_val, false);
 
   // create a solver to track the parent node of each infeasible term we create
   SolverInterface* tmpSolverParent =
@@ -1786,7 +1736,7 @@ void VPCEventHandler::createStrongBranchingTerms(
     double val = child_exclusive_val[idx] + (child_exclusive_bound[idx] == 0 ? -1 : 1);
     // create the disjunctive term for the node pruned by strong branching
     setupDisjunctiveTerm(tmpSolverParent, parent_var, parent_bound, parent_val,
-                         child_exclusive_var[idx], bound, val, "complement");
+                         child_exclusive_var[idx], bound, val, "complement", tmpSolverRoot);
     // augment the solver and common branching decisions for the next term
     addVarBound(tmpSolverParent, child_exclusive_var[idx], child_exclusive_bound[idx],
                 child_exclusive_val[idx], parent_var, parent_bound, parent_val);
@@ -1810,10 +1760,13 @@ void VPCEventHandler::createStrongBranchingTerms(
 void VPCEventHandler::recursivelyCreateStrongBranchingTerms(
     const int node_id, const std::vector<int>& common_var,
     const std::vector<int>& common_bound, const std::vector<double>& common_value,
-    const SolverInterface* const tmpSolverBase){
+    const SolverInterface* const tmpSolverBase, const SolverInterface* const tmpSolverRoot){
 
   // we assume tmpSolverBase already has the common_ variable bounds applied
   checkBounds(tmpSolverBase, common_var, common_bound, common_value);
+  // we assume tmpSolverRoot should not have any of the tightened bounds on the root node applied
+  checkBounds(tmpSolverRoot, common_var, common_bound, common_value, false);
+  // make sure node_id is reasonably valued
   verify(0 <= node_id && node_id < stats_.size(), "node_id must be in stats_.");
 
   // declare variables - need orig_id's for the branching decisions
@@ -1830,7 +1783,7 @@ void VPCEventHandler::recursivelyCreateStrongBranchingTerms(
 
     // recurse on the parent node
     recursivelyCreateStrongBranchingTerms(parent_id, common_var, common_bound,
-                                          common_value, tmpSolverBase);
+                                          common_value, tmpSolverBase, tmpSolverRoot);
 
     // if the node has more tightened bounds relative to its parent than just its parent's branching choice.
     // first condition needs to ignore child's of root node bounds b/c it includes root node fixes
@@ -1874,8 +1827,8 @@ void VPCEventHandler::recursivelyCreateStrongBranchingTerms(
 
       // create disjunctive terms for those fixed by strong branching at current node
       createStrongBranchingTerms(child_exclusive_var, child_exclusive_bound,
-                                 child_exclusive_val, tmpSolver, term_var,
-                                 term_bound, term_value);
+                                 child_exclusive_val, tmpSolver, tmpSolverRoot,
+                                 term_var, term_bound, term_value);
     }
 
     // add the current node to the set of checked nodes
@@ -1926,7 +1879,7 @@ int VPCEventHandler::saveInformationWithPrunes() {
   setWarmStart(tmpSolverRoot, original_basis);
 
   // add disjunctive terms for the pruned branching decisions found at the root
-  createStrongBranchingTerms(common_var, common_bound, common_value, tmpSolverRoot);
+  createStrongBranchingTerms(common_var, common_bound, common_value, tmpSolverRoot, tmpSolverRoot);
 
   // add disjunctive terms for the nodes pruned by branch and bound
   for (int tmp_ind = 0; tmp_ind < (int) pruned_stats_.size(); tmp_ind++) {
@@ -1957,7 +1910,7 @@ int VPCEventHandler::saveInformationWithPrunes() {
     // find and create any disjunctive terms pruned due to strong branching between
     // the root and the node we're about to create a disjunctive term for
     recursivelyCreateStrongBranchingTerms(node_id, common_var, common_bound,
-                                          common_value, tmpSolverPruned); // stop here on tmp_idx = 3
+                                          common_value, tmpSolverPruned, tmpSolverRoot); // stop here on tmp_idx = 3
 
     // Collect the parent changed node bounds
     const int curr_num_changed_bounds =
@@ -1975,7 +1928,7 @@ int VPCEventHandler::saveInformationWithPrunes() {
     // create the term
     setupDisjunctiveTerm(tmpSolverPruned, term_var, term_bound, term_value,
                          branching_variable, branching_way == 1 ? 0 : 1,
-                         branching_value, "pruned");
+                         branching_value, "pruned", tmpSolverRoot);
   } // loop over pruned nodes
 
   // If an integer solution was found, save it
@@ -2019,7 +1972,7 @@ int VPCEventHandler::saveInformationWithPrunes() {
     // find and create any disjunctive terms pruned due to strong branching between
     // the root and the nodes we're about to create disjunctive terms for
     recursivelyCreateStrongBranchingTerms(node_id, common_var, common_bound,
-                                          common_value, tmpSolverBase);
+                                          common_value, tmpSolverBase, tmpSolverRoot);
 
     // Change bounds in the solver for variable bounds tightened between the root
     // node and this node's children (i.e. the nodes for the terms we're about to create)
@@ -2051,7 +2004,7 @@ int VPCEventHandler::saveInformationWithPrunes() {
 #endif
     hasFeasibleChild = setupDisjunctiveTerm(
         tmpSolverBase, term_var, term_bound, term_value, branching_variable,
-        branching_way == 1 ? 0 : 1, branching_value, "leaf", node_id);
+        branching_way == 1 ? 0 : 1, branching_value, "leaf", tmpSolverRoot, node_id);
 
     if (branching_index == 0) { // should we compute a second branch?
 #ifdef TRACE
@@ -2062,7 +2015,7 @@ int VPCEventHandler::saveInformationWithPrunes() {
       branching_value = (branching_way <= 0) ? branching_value - 1 : branching_value + 1;
       const bool childIsFeasible = setupDisjunctiveTerm(
           tmpSolverBase, term_var, term_bound, term_value, branching_variable,
-          branching_way == 1 ? 0 : 1, branching_value, "leaf", node_id);
+          branching_way == 1 ? 0 : 1, branching_value, "leaf", tmpSolverRoot, node_id);
       hasFeasibleChild = hasFeasibleChild || childIsFeasible;
     } // end second branch computation
 

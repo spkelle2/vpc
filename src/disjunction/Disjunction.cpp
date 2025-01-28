@@ -60,6 +60,13 @@ void DisjunctiveTerm::initialize(const DisjunctiveTerm* const source) {
     if (source->basis) {
       basis = source->basis->clone();
     }
+    if (basis_extended) {
+      delete basis_extended;
+      basis_extended = NULL;
+    }
+    if (source->basis_extended) {
+      basis_extended = source->basis_extended->clone();
+    }
     ineqs = source->ineqs;
 #endif
   } else {
@@ -85,6 +92,10 @@ void DisjunctiveTerm::clear() {
   if (basis) {
     delete basis;
     basis = NULL;
+  }
+  if (basis_extended) {
+    delete basis_extended;
+    basis_extended = NULL;
   }
 #endif
 } /* clear */
@@ -194,8 +205,9 @@ void Disjunction::getSolverForTerm(
     termSolver->applyRowCuts(1, currCut); // hopefully this works
   }
 
-  // Set the warm start
-  if (term->basis && !(termSolver->setWarmStart(term->basis))) {
+  // Set the appropriate warm start
+  if ((shouldChangeBounds && term->basis && !(termSolver->setWarmStart(term->basis))) ||
+      (!shouldChangeBounds && term->basis_extended && !(termSolver->setWarmStart(term->basis_extended)))) {
     error_msg(errorstring,
         "Warm start information not accepted for term %d/%d.\n", term_ind+1, this->num_terms);
     writeErrorToLog(errorstring, logfile);
@@ -206,7 +218,11 @@ void Disjunction::getSolverForTerm(
 #ifdef TRACE
   printf("\n## Solving for term %d/%d. ##\n", term_ind+1, this->num_terms);
 #endif
+  int orig_iters = termSolver->getIterationCount();
   termSolver->resolve();
+  if (orig_iters + 3 < termSolver->getIterationCount()){
+    int x = 5;
+  }
   bool calcAndFeasTerm = checkSolverOptimality(termSolver, true);
 
   // Sometimes we run into a few issues getting the ``right'' value

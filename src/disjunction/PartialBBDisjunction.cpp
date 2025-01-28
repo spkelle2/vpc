@@ -341,7 +341,7 @@ PartialBBDisjunction PartialBBDisjunction::parameterize(const OsiSolverInterface
     term.is_feasible = checkSolverOptimality(termSolver, true);
     term.obj = term.is_feasible ? termSolver->getObjValue() : std::numeric_limits<double>::max();
     enableFactorization(termSolver, params.get(doubleParam::EPS));
-    term.basis = dynamic_cast<CoinWarmStartBasis*>(termSolver->getWarmStart());
+    term.basis_extended = dynamic_cast<CoinWarmStartBasis*>(termSolver->getWarmStart());
 
     // update the necessary disjunction metadata
     disj.updateObjValue(term.obj);
