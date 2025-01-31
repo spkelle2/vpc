@@ -137,7 +137,8 @@ public:
     const bool shouldChangeBounds,
     const double DIFFEPS,
     FILE* logfile,
-    const bool parameterized=false) const;
+    const bool parameterized=false,
+    const bool deleteInfeasibleBaseInstance=true) const;
 #else
   void getSolverForTerm(const int term_ind) const;
 #endif

@@ -165,7 +165,10 @@ void Disjunction::getSolverForTerm(
     /// [in] logfile for error printing
     FILE* logfile,
     /// [in] whether or not this term is a parameterization of the original disjunctive term
-    bool parameterized) const {
+    bool parameterized,
+    /// [in] whether or not to delete termSolver if its infeasible and not parameterized
+    bool deleteInfeasibleBaseInstance
+    ) const {
   termSolver = solver->clone();
   const DisjunctiveTerm* const term = &(this->terms[term_ind]);
 
@@ -230,7 +233,9 @@ void Disjunction::getSolverForTerm(
   if (!parameterized) {
     if (!calcAndFeasTerm) {
       printf("\n## Term %d/%d is not proven optimal. Exiting from this term. ##\n", term_ind+1, this->num_terms);
-      delete termSolver;
+      if (deleteInfeasibleBaseInstance) {
+        delete termSolver;
+      }
       return;
     }
     if (!isVal(termSolver->getObjValue(), term->obj, DIFFEPS)) {

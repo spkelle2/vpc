@@ -200,7 +200,6 @@ TEST_CASE("Test saveInformation", "[VPCEventHandler::saveInformation]") {
       REQUIRE(termSolverExt->getIterationCount() == 0);
     }
   }
-
 }
 
 

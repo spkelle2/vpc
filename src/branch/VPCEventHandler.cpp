@@ -1667,10 +1667,9 @@ bool VPCEventHandler::setupDisjunctiveTerm(
 
   // get the basis for the extended solver (i.e. when adding disjunctive constraints
   // as constraints and not tightened variable bounds)
-  OsiSolverInterface* tmpSolverNodeExtended =
-      dynamic_cast<OsiSolverInterface*>(tmpSolverRoot->clone());
+  OsiSolverInterface* tmpSolverNodeExtended;
   owner->getSolverForTerm(tmpSolverNodeExtended, owner->terms.size() - 1,
-                          tmpSolverRoot, false, .001, NULL, false);
+                          tmpSolverRoot, false, .001, NULL, false, false);
   term.basis_extended = dynamic_cast<CoinWarmStartBasis*>(tmpSolverNodeExtended->getWarmStart());
 
   // delete the solvers
