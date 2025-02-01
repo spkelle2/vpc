@@ -6,6 +6,7 @@
 #pragma once
 
 #include <limits> // numeric_limits
+#include <memory> // unique_ptr
 
 #include "VPCDisjunction.hpp"
 
@@ -119,7 +120,8 @@ public:
   virtual DisjExitReason prepareDisjunction(const OsiSolverInterface* const si);
 
   /// @brief Create a new disjunction that parameterizes the curren with the given solver.
-  PartialBBDisjunction parameterize(const OsiSolverInterface* const solver) const;
+  PartialBBDisjunction parameterize(const OsiSolverInterface* const solver,
+                                    std::vector<std::unique_ptr<OsiSolverInterface>>* term_solvers = nullptr) const;
 
 protected:
   /// @brief Initialize values of class members

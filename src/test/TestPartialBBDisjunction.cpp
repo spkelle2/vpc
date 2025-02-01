@@ -8,6 +8,7 @@
 
 // standard library
 #include <cstdlib> // abs
+#include <memory>
 #include <vector> // vector
 
 // unit test library
@@ -152,7 +153,8 @@ TEST_CASE("Test saveInformation", "[VPCEventHandler::saveInformation]") {
     }
     si.resolve();
 
-    PartialBBDisjunction param_disj = disj.parameterize(&si);
+    std::vector<std::unique_ptr<OsiSolverInterface>> term_solvers;
+    PartialBBDisjunction param_disj = disj.parameterize(&si, &term_solvers);
 
     // check that we have the right metadata
     REQUIRE(param_disj.num_terms == 4);
@@ -198,6 +200,10 @@ TEST_CASE("Test saveInformation", "[VPCEventHandler::saveInformation]") {
       termSolverExt->setWarmStart(param_disj.terms[term_idx].basis_extended);
       termSolverExt->resolve();
       REQUIRE(termSolverExt->getIterationCount() == 0);
+
+      // check the cached solver matches the one used to create the disjunctive term
+      OsiSolverInterface* cached_term_solver = term_solvers[term_idx].get();
+      REQUIRE(sameBasis(cached_term_solver->getWarmStart(), termSolverExt->getWarmStart()));
     }
   }
 }

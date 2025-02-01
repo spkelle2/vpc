@@ -296,11 +296,18 @@ DisjExitReason PartialBBDisjunction::prepareDisjunction(const OsiSolverInterface
  *
  * @param solver to update the disjunction with
  */
-PartialBBDisjunction PartialBBDisjunction::parameterize(const OsiSolverInterface* const solver) const {
+PartialBBDisjunction PartialBBDisjunction::parameterize(const OsiSolverInterface* const solver,
+                                                        std::vector<std::unique_ptr<OsiSolverInterface>>* term_solvers) const {
 
   verify(this->common_changed_var.size() == 0 && this->common_changed_bound.size() == 0
          && this->common_changed_value.size() == 0 && this->common_ineqs.size() == 0,
          "Cannot parameterize a disjunction that has common terms or inequalities.");
+
+  // If no vector is provided for the term solvers, use a temp local one
+  std::vector<std::unique_ptr<OsiSolverInterface>> local_solvers;
+  if (!term_solvers) {
+    term_solvers = &local_solvers;
+  }
 
   // get a copy of the solver
   SolverInterface* si = dynamic_cast<SolverInterface*>(solver->clone());
@@ -348,6 +355,9 @@ PartialBBDisjunction PartialBBDisjunction::parameterize(const OsiSolverInterface
     disj.terms.push_back(term);
     disj.num_infeasible_terms += !term.is_feasible;
     disj.num_terms++;
+
+    // cache the solver
+    term_solvers->emplace_back(std::unique_ptr<OsiSolverInterface>(termSolver->clone()));
   }
 
   // sanity check - egregious errors should be avoided by not counting objectives from infeasible terms
