@@ -131,6 +131,7 @@ class GurobiUserCutCallback : public GRBCallback {
     bool setFirstCutPass;
     double first_lp_opt;
     BBInfo info;
+    std::vector<std::vector<double>> solutions; // Stores all solutions
 
     GurobiUserCutCallback(const VPCParameters& params, int num_vars, double obj_offset,
         GRBVar* vars, const OsiCuts* cutsToAdd, const bool lazyFlag = false)
@@ -178,6 +179,12 @@ class GurobiUserCutCallback : public GRBCallback {
             this->info.last_sol_time = GRBCallback::getDoubleInfo(GRB_CB_RUNTIME);
             this->info.obj = obj;
           }
+          // save the solution
+          std::vector<double> solution(num_vars);
+          for (int i = 0; i < num_vars; i++) {
+              solution[i] = getSolution(grb_vars[i]);
+          }
+          solutions.push_back(solution);
         }
         else if (where == GRB_CB_MIP) {
           const int num_nodes = GRBCallback::getDoubleInfo(GRB_CB_MIP_NODCNT);
@@ -313,7 +320,7 @@ class GurobiUserCutCallback : public GRBCallback {
     } /* callback */
 }; /* class GurobiUserCutCallback */
 
-void presolveModelWithGurobi(const VPCParameters& params, int strategy, 
+void presolveModelWithGurobi(const VPCParameters& params, int strategy,
     GRBModel& model, double& presolved_lp_opt, std::string& presolved_name,
     const double best_bound) {
 //#ifdef TRACE
@@ -388,7 +395,7 @@ void presolveModelWithGurobi(const VPCParameters& params, int strategy,
 } /* presolveModelWithGurobi (Osi) */
 
 void doBranchAndBoundWithGurobi(const VPCParameters& params, int strategy,
-    GRBModel& model, BBInfo& info, const double best_bound, 
+    GRBModel& model, BBInfo& info, const double best_bound,
     std::vector<double>* const solution = NULL) {
 //#ifdef TRACE
   printf("\tRunning B&B with Gurobi. Strategy: %d. Random seed: %d.\n",
@@ -498,12 +505,18 @@ void doBranchAndBoundWithGurobi(const VPCParameters& params, int strategy,
 void doBranchAndBoundWithUserCutsGurobi(const VPCParameters& params,
     int strategy, GRBModel& model, const OsiCuts* cuts, BBInfo& info,
     const double best_bound, const bool addAsLazy,
-    std::vector<double>* const solution = NULL) {
+    std::vector<double>* const solution = NULL,
+    std::vector<std::vector<double>>* solutionPool = nullptr) {
   // Ensure that user cuts setting is enabled
   if (!use_bb_option(strategy, BB_Strategy_Options::user_cuts)) {
     warning_msg(warnstring,
         "Need to use user_cuts option; strategy currently: %d.\n", strategy);
     strategy = enable_bb_option(strategy, BB_Strategy_Options::user_cuts);
+  }
+
+  std::vector<std::vector<double>> tmpSolutionPool = std::vector<std::vector<double>>();
+  if (!solutionPool) {
+    solutionPool = &tmpSolutionPool;
   }
 
   try {
@@ -553,6 +566,8 @@ void doBranchAndBoundWithUserCutsGurobi(const VPCParameters& params,
         info.last_sol_time = cb.info.last_sol_time; // roughly the same as total time in this case
       }
     }
+    // Save the solutions
+    *solutionPool = std::move(cb.solutions);
 //#ifdef TRACE
 //    printf("Gurobi: Times cuts applied: %d.\n", cb.numTimesApplied);
 //#endif
@@ -604,14 +619,15 @@ void doBranchAndBoundWithGurobi(const VPCParameters& params, int strategy,
 
 void doBranchAndBoundWithUserCutsGurobi(const VPCParameters& params,
     int strategy, const char* f_name, const OsiCuts* cuts, BBInfo& info,
-    const double best_bound, const bool addAsLazy) {
+    const double best_bound, const bool addAsLazy,
+    std::vector<std::vector<double>>* solutionPool) {
 #ifdef TRACE
   printf("\n## Reading from file into Gurobi and adding user cuts. ##\n");
 #endif
   try {
     GRBEnv env = GRBEnv();
     GRBModel model = GRBModel(env, f_name);
-    doBranchAndBoundWithUserCutsGurobi(params, strategy, model, cuts, info, best_bound, addAsLazy);
+    doBranchAndBoundWithUserCutsGurobi(params, strategy, model, cuts, info, best_bound, addAsLazy, NULL, solutionPool);
   } catch (GRBException& e) {
     error_msg(errorstring, "Gurobi: Exception caught: %s\n", e.getMessage().c_str());
     writeErrorToLog(errorstring, params.logfile);
@@ -625,13 +641,14 @@ void doBranchAndBoundWithUserCutsGurobi(const VPCParameters& params,
 
 void doBranchAndBoundWithUserCutsGurobi(const VPCParameters& params, int strategy,
     const OsiSolverInterface* const solver, const OsiCuts* cuts, BBInfo& info,
-    const double best_bound, const bool addAsLazy) {
+    const double best_bound, const bool addAsLazy,
+    std::vector<std::vector<double>>* solutionPool) {
   std::string f_name;
   createTmpFileCopy(params, solver, f_name);
   // create a new strings to match what was actually created
   std::string f_name_no_ext = f_name.substr(0, f_name.size() - 4);
   std::string f_name_gz = f_name + ".gz";
-  doBranchAndBoundWithUserCutsGurobi(params, strategy, f_name.c_str(), cuts, info, best_bound, addAsLazy);
+  doBranchAndBoundWithUserCutsGurobi(params, strategy, f_name.c_str(), cuts, info, best_bound, addAsLazy, solutionPool);
   // remove temporary files
   remove(f_name.c_str());
   remove(f_name_gz.c_str());

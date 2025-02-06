@@ -33,8 +33,10 @@ void doBranchAndBoundWithGurobi(const VPCParametersNamespace::VPCParameters& par
     std::vector<double>* const solution = NULL);
 void doBranchAndBoundWithUserCutsGurobi(const VPCParametersNamespace::VPCParameters& params, int strategy,
     const char* f_name, const OsiCuts* cuts, BBInfo& info,
-    const double best_bound, const bool addAsLazy = false);
+    const double best_bound, const bool addAsLazy = false,
+    std::vector<std::vector<double>>* solutionPool = nullptr);
 void doBranchAndBoundWithUserCutsGurobi(const VPCParametersNamespace::VPCParameters& params, int strategy,
     const OsiSolverInterface* const solver, const OsiCuts* cuts, BBInfo& info,
-    const double best_bound, const bool addAsLazy = false);
+    const double best_bound, const bool addAsLazy = false,
+    std::vector<std::vector<double>>* solutionPool = nullptr);
 #endif /* USE_GUROBI */
