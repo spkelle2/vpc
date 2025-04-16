@@ -815,7 +815,9 @@ bool isFeasible(
     /// [in] problem
     const OsiSolverInterface& solver,
     /// [in] solution
-    const std::vector<double>& sol) {
+    const std::vector<double>& sol,
+    /// [in] whether or not to relax integrality constraints
+    bool relax_integrality) {
 
   // get bounds and constraint coefficients
   const double* rowLower = solver.getRowLower();
@@ -846,10 +848,12 @@ bool isFeasible(
 
   // make sure variables are valid
   for (int col = 0; col < solver.getNumCols(); col++) {
+    // variable bounds
     if (lessThanVal(sol[col], colLower[col]) || greaterThanVal(sol[col], colUpper[col])) {
       return false;
     }
-    if (solver.isInteger(col) && !isInteger(sol[col])) {
+    // integrality - if checking
+    if (!relax_integrality && solver.isInteger(col) && !isInteger(sol[col])) {
       return false;
     }
   }

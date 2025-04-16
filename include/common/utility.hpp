@@ -418,7 +418,9 @@ bool isFeasible(
     /// [in] problem
     const OsiSolverInterface& solver,
     /// [in] solution
-    const std::vector<double>& sol);
+    const std::vector<double>& sol,
+    /// [in] whether or not to relax integrality constraints
+    bool relax_integrality=false);
 
 /** check if a value is an integer */
 bool isInteger(double val);

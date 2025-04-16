@@ -1670,7 +1670,14 @@ bool VPCEventHandler::setupDisjunctiveTerm(
   OsiSolverInterface* tmpSolverNodeExtended;
   owner->getSolverForTerm(tmpSolverNodeExtended, owner->terms.size() - 1,
                           tmpSolverRoot, false, .001, NULL, false, false);
-  term.basis_extended = dynamic_cast<CoinWarmStartBasis*>(tmpSolverNodeExtended->getWarmStart());
+  enableFactorization(tmpSolverNodeExtended, owner->params.get(doubleParam::EPS));
+  tmpSolverNodeExtended->resolve(); // factorization may have changed the solution slightly
+  if (term.is_feasible){
+    verify(isVal(tmpSolverNodeExtended->getObjValue(), term.obj),
+           "Objective values must match for feasible terms.");
+  }
+  owner->terms[owner->terms.size() - 1].basis_extended =
+      dynamic_cast<CoinWarmStartBasis*>(tmpSolverNodeExtended->getWarmStart());
 
   // delete the solvers
   delete tmpSolverNode;

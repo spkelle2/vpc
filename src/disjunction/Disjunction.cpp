@@ -158,18 +158,18 @@ void Disjunction::getSolverForTerm(
     const int term_ind,
     /// [in] original solver
     const OsiSolverInterface* const solver,
-    /// [in] whether bounds should be changed or explicit constraints should be added
+    /// [in] whether bounds should be changed or explicit constraints should be added to reflect disjunctive term constraints
     const bool shouldChangeBounds,
     /// [in] tolerance for reconstructing disjunctive term solution
     const double DIFFEPS,
     /// [in] logfile for error printing
     FILE* logfile,
     /// [in] whether or not this term is a parameterization of the original disjunctive term
-    bool parameterized,
+    const bool parameterized,
     /// [in] whether or not to delete termSolver if its infeasible and not parameterized
-    bool deleteInfeasibleBaseInstance
+    const bool deleteInfeasibleBaseInstance
     ) const {
-  termSolver = solver->clone();
+  termSolver = solver->clone();  // this calls new, which is why we pass the pointer by reference
   const DisjunctiveTerm* const term = &(this->terms[term_ind]);
 
   for (int i = 0; i < (int) this->common_changed_var.size(); i++) {
