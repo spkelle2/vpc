@@ -129,6 +129,7 @@ USE_COIN   = 1
 USE_CLP    = 1
 USE_CBC    = 1
 USE_GUROBI = 1
+USE_SYMPHONY = 1
 USE_CPLEX  = 0
 USE_CLP_SOLVER = 1
 USE_CPLEX_SOLVER = 0
@@ -232,6 +233,10 @@ ifeq ($(USE_GUROBI),1)
   GUROBI_INC="${GUROBI_DIR}/macos_universal2/include"
   GUROBI_LIB="${GUROBI_DIR}/macos_universal2/lib"
 endif
+ifeq ($(USE_SYMPHONY),1)
+	DEFS += -DUSE_SYMPHONY
+	SOURCES += test/SymphonyHelper.cpp
+endif
 ifeq ($(USE_CPLEX),1)
   DEFS += -DIL_STD -DUSE_CPLEX
   SOURCES += test/CplexHelper.cpp
@@ -322,6 +327,14 @@ ifeq ($(USE_COIN),1)
   ifeq ($(USE_CLP),1)
     APPLLIB += -lOsiClp
   endif
+  ifeq ($(USE_SYMPHONY),1)
+			# SYMPHONY should be built via coinbrew with Cbc and thus in same build dir
+			SYMPHONY_INC = $(CBC)/include/coin
+			SYMPHONY_LIB = $(CBC)/lib
+			APPLINCLS += -isystem $(SYMPHONY_INC)
+      APPLLIB += -L$(SYMPHONY_LIB) -lOsiSym -lSym
+      CXXLINKFLAGS += -Wl,-rpath $(SYMPHONY_LIB)
+	endif
   APPLLIB += -lCgl
   APPLLIB += -lOsi
   ifeq ($(USE_CLP),1)
@@ -466,6 +479,7 @@ print: FORCE
 	$(info USE_CLP: ${USE_CLP})
 	$(info USE_CBC: ${USE_CBC})
 	$(info USE_GUROBI: ${USE_GUROBI})
+	$(info USE_SYMPHONY: ${USE_SYMPHONY})
 	$(info USE_CPLEX: ${USE_CPLEX})
 	$(info OUT_DIR: ${OUT_DIR})
 	$(info DEBUG_FLAG: ${DEBUG_FLAG})
