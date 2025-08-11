@@ -14,6 +14,14 @@ namespace VPCParametersNamespace {
 }
 
 #ifdef USE_SYMPHONY
+
+#include "OsiSymSolverInterface.hpp"
+
+// set requested parameters for Symphony
+void setStrategyForBBTestSymphony(const VPCParametersNamespace::VPCParameters& params,
+                                  const int strategy, OsiSymSolverInterface& model,
+                                  const double best_bound, int seed = -1);
+
 // helper function to solve a MILP with Symphony
 void doBranchAndBoundWithSymphony(const VPCParametersNamespace::VPCParameters& params,
                                   int strategy, const OsiSolverInterface* const solver,
