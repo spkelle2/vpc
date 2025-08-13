@@ -25,5 +25,6 @@ void setStrategyForBBTestSymphony(const VPCParametersNamespace::VPCParameters& p
 // helper function to solve a MILP with Symphony
 void doBranchAndBoundWithSymphony(const VPCParametersNamespace::VPCParameters& params,
                                   int strategy, const OsiSolverInterface* const solver,
-                                  BBInfo& info, const double best_bound);
+                                  BBInfo& info, const OsiCuts* cuts = nullptr,
+                                  const double best_bound = std::numeric_limits<double>::max());
 #endif /* USE_SYMPHONY */

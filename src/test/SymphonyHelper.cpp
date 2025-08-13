@@ -4,6 +4,31 @@
  * @date 2025-Aug-04
  */
 
+#ifdef USE_SYMPHONY
+
+//// Symphony C headers FIRST
+//extern "C" {
+//
+#include <stdio.h>   // defines FILE
+//
+//  // 1) Pull in TM first so we get the 4-arg prototypes.
+#include "sym_tm.h"
+//
+//  // 2) Mask legacy prototypes ONLY for sym_master.h.
+//  #define read_node  read_node__masked__do_not_use
+//  #define write_node write_node__masked__do_not_use
+//
+//  // 3) Now include sym_master.h; any legacy 2-arg decls will be renamed,
+//  //    avoiding a signature conflict with the already-seen 4-arg versions.
+#include "sym_master.h"
+//
+//  // 4) Unmask so the rest of your TU sees normal names again (we're not calling them here).
+//  #undef read_node
+//  #undef write_node
+//}
+
+#endif
+
 #include "SymphonyHelper.hpp"
 
 // Project files
@@ -13,8 +38,11 @@
 #include "VPCParameters.hpp"
 using namespace VPCParametersNamespace;
 
-#ifdef USE_SYMPHONY
+// COIN-OR
+#include <CoinTime.hpp>
+#include <OsiCuts.hpp>
 
+#ifdef USE_SYMPHONY
 
 // set requested parameters for Symphony
 void setStrategyForBBTestSymphony(const VPCParameters& params,
@@ -38,13 +66,6 @@ void setStrategyForBBTestSymphony(const VPCParameters& params,
 
   // ---- Strategy-controlled toggles ----
   if (strategy > 0) {
-    if (use_bb_option(strategy, BB_Strategy_Options::user_cuts)) {
-      // print warning if the user provides cuts
-        std::cerr << "User provided cuts, but this feature has not yet been "
-                     "integrated with Symphony. Ignoring them and proceeding "
-                     "with branch-and-bound without warm-started cut pool." << std::endl;
-    }
-
     if (use_bb_option(strategy, BB_Strategy_Options::all_cuts_off)) {
       model.setSymParam("generate_cgl_cuts", false);
     }
@@ -61,7 +82,7 @@ void setStrategyForBBTestSymphony(const VPCParameters& params,
       if (!isInfinity(std::abs(best_bound))) {
         //  - "upper_bound": prune nodes with obj >= UB (cutoff)
         // todo check to make sure this works
-        model.setSymParam("upper_bound", best_bound * (1 + 1e-4));
+        model.setSymParam("upper_bound", (1 + 1e-6) * best_bound); // set to granularity based on symphony make the same calculation
       }
       // Check if user provides mip start or solution file
       std::string solfile = params.get(stringParam::SOLFILE);
@@ -92,7 +113,8 @@ void setStrategyForBBTestSymphony(const VPCParameters& params,
 
 void doBranchAndBoundWithSymphony(const VPCParameters& params, int strategy,
                                   const OsiSolverInterface* const solver,
-                                  BBInfo& info, const double best_bound) {
+                                  BBInfo& info, const OsiCuts* cuts,
+                                  const double best_bound) {
 
   // Copy the OsiSolverInterface into a SYMPHONY OSI solver
   OsiSymSolverInterface model;
@@ -110,19 +132,34 @@ void doBranchAndBoundWithSymphony(const VPCParameters& params, int strategy,
   // set parameters
   setStrategyForBBTestSymphony(params, strategy, model, best_bound);
 
-  // todo: enable call back for data collection
-
-  // Solve the problem
-  model.initialSolve();
-  model.branchAndBound();
-
-  // Report solution
-  if (model.isProvenOptimal()) {
-    std::cout << "SYMPHONY found an optimal solution.\n";
-    std::cout << "Objective value: " << model.getObjValue() << std::endl;
-  } else {
-    std::cout << "Solver stopped without finding optimal solution." << std::endl;
+  // add user cuts
+  if (cuts && cuts->sizeCuts() > 0) {
+    model.applyCuts(*cuts);
   }
+
+  // solve model
+  model.initialSolve();
+
+  // collect statistics
+  sym_environment * env = model.getSymphonyEnvironment();
+
+  // bounds
+  info.last_cut_pass = env->tm->stat.root_lb;
+  info.bound = env->tm->lb;
+  info.obj = env->tm->ub;
+
+  // times todo: get root processing time
+  info.time = env->comp_times.readtime + env->comp_times.ub_overhead +
+      env->comp_times.ub_heurtime + env->comp_times.lb_overhead +
+      env->comp_times.lb_heurtime + env->tm->comp_times.communication +
+      env->tm->comp_times.lp + env->tm->comp_times.lp_setup +
+      env->tm->comp_times.separation + env->tm->comp_times.fixing +
+      env->tm->comp_times.pricing + env->tm->comp_times.strong_branching +
+      env->tm->comp_times.cut_pool + env->tm->comp_times.primal_heur;
+
+  // processing steps
+  info.nodes = env->tm->stat.analyzed;
+  info.iters = env->tm->lp_stat.lp_iter_num;
 }
 
 #endif /* USE_SYMPHONY */

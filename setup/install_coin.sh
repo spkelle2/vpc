@@ -84,12 +84,16 @@ then
   else
     ./coinbrew fetch Cbc@${CBC_VERSION}
   fi
+  ./coinbrew fetch SYMPHONY
+
   # -b: specify build directory
   # -p: install in same directory as build
   #./coinbrew build install Cbc -b build -p --no-prompt --test --with-cplex=false ADD_CXXFLAGS="-DSAVE_NODE_INFO"
   #./coinbrew build install Cbc -b buildg -p --no-prompt --test --with-cplex=false --enable-debug ADD_CXXFLAGS="-DSAVE_NODE_INFO"
   ./coinbrew build Cbc -b build -p build --no-prompt ADD_CXXFLAGS="-DSAVE_NODE_INFO" --tests none
   ./coinbrew build Cbc -b buildg -p buildg --no-prompt --enable-debug ADD_CXXFLAGS="-DSAVE_NODE_INFO" --tests none
+  ./coinbrew build SYMPHONY -b build -p build --no-prompt --skip-dependencies ADD_CXXFLAGS="-DCOMPILE_IN_TM" --tests none
+  ./coinbrew build SYMPHONY -b buildg -p buildg --no-prompt --enable-debug --skip-dependencies ADD_CXXFLAGS="-DCOMPILE_IN_TM" --tests none
 else
   ## Ignore below unless you wish to use OsiCpxSolverInterface
   #UNAME=`uname`
