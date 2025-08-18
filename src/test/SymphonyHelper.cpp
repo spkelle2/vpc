@@ -81,8 +81,7 @@ void setStrategyForBBTestSymphony(const VPCParameters& params,
     if (use_bb_option(strategy, BB_Strategy_Options::use_best_bound)) {
       if (!isInfinity(std::abs(best_bound))) {
         //  - "upper_bound": prune nodes with obj >= UB (cutoff)
-        // todo check to make sure this works
-        model.setSymParam("upper_bound", (1 + 1e-6) * best_bound); // set to granularity based on symphony make the same calculation
+        model.setSymParam("upper_bound", best_bound); // set to granularity based on symphony make the same calculation
       }
       // Check if user provides mip start or solution file
       std::string solfile = params.get(stringParam::SOLFILE);
@@ -116,10 +115,14 @@ void doBranchAndBoundWithSymphony(const VPCParameters& params, int strategy,
                                   BBInfo& info, const OsiCuts* cuts,
                                   const double best_bound) {
 
-  // Copy the OsiSolverInterface into a SYMPHONY OSI solver
+  // Symphony appears to trash the start if paused to get root statistics so create a copy
+  OsiSymSolverInterface root_model;
   OsiSymSolverInterface model;
+
+  // Copy the OsiSolverInterface into a SYMPHONY OSI solver
   std::string f_name;
   createTmpFileCopy(params, solver, f_name);
+  root_model.readMps(f_name.c_str());
   model.readMps(f_name.c_str());
 
   // remove temporary files from createTmpFileCopy
@@ -130,25 +133,39 @@ void doBranchAndBoundWithSymphony(const VPCParameters& params, int strategy,
   remove(f_name_no_ext.c_str());
 
   // set parameters
+  setStrategyForBBTestSymphony(params, strategy, root_model, best_bound);
   setStrategyForBBTestSymphony(params, strategy, model, best_bound);
 
   // add user cuts
   if (cuts && cuts->sizeCuts() > 0) {
+    root_model.applyCuts(*cuts);
     model.applyCuts(*cuts);
   }
 
-  // solve model
-  model.initialSolve();
+  // solve root node
+  root_model.setSymParam("node_limit", 1);
+  root_model.initialSolve();
+  sym_environment * env = root_model.getSymphonyEnvironment();
 
-  // collect statistics
-  sym_environment * env = model.getSymphonyEnvironment();
+  // collect root statistics
+  info.root_time = env->comp_times.readtime + env->comp_times.ub_overhead +
+      env->comp_times.ub_heurtime + env->comp_times.lb_overhead +
+      env->comp_times.lb_heurtime + env->tm->comp_times.communication +
+      env->tm->comp_times.lp + env->tm->comp_times.lp_setup +
+      env->tm->comp_times.separation + env->tm->comp_times.fixing +
+      env->tm->comp_times.pricing + env->tm->comp_times.strong_branching +
+      env->tm->comp_times.cut_pool + env->tm->comp_times.primal_heur;
+
+  // solve the branch-and-bound tree
+  model.resolve();
+  env = model.getSymphonyEnvironment();
 
   // bounds
   info.last_cut_pass = env->tm->stat.root_lb;
   info.bound = env->tm->lb;
   info.obj = env->tm->ub;
 
-  // times todo: get root processing time
+  // times
   info.time = env->comp_times.readtime + env->comp_times.ub_overhead +
       env->comp_times.ub_heurtime + env->comp_times.lb_overhead +
       env->comp_times.lb_heurtime + env->tm->comp_times.communication +
