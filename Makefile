@@ -26,7 +26,7 @@ RM = rm -f
 BUILD_CONFIG = unit_test
 BUILD_CONFIG = release
 BUILD_CONFIG = debug
-UNIT_TEST_FILE = TestPartialBBDisjunction.cpp
+UNIT_TEST_FILE = TestSymphonyHelper.cpp
 
 ### Variables user should set ###
 PROJ_DIR=${PWD}
@@ -234,7 +234,7 @@ ifeq ($(USE_GUROBI),1)
   GUROBI_LIB="${GUROBI_DIR}/macos_universal2/lib"
 endif
 ifeq ($(USE_SYMPHONY),1)
-	DEFS += -DUSE_SYMPHONY
+	DEFS += -DUSE_SYMPHONY -D__OSI_CLP__ -DSENSITIVITY_ANALYSIS -DUSE_CGL_CUTS -DSIGHANDLER -DHAS_RANDOM -DHAS_SRANDOM -D__NONE__ -D__DARWIN -DCOMPILE_IN_CG -DCOMPILE_IN_CP -DCOMPILE_IN_LP -DCOMPILE_IN_TM
 	SOURCES += test/SymphonyHelper.cpp
 endif
 ifeq ($(USE_CPLEX),1)
@@ -331,7 +331,9 @@ ifeq ($(USE_COIN),1)
 			# SYMPHONY should be built via coinbrew with Cbc and thus in same build dir
 			SYMPHONY_INC = $(CBC)/include/coin
 			SYMPHONY_LIB = $(CBC)/lib
-			APPLINCLS += -isystem $(SYMPHONY_INC)
+			# however C headers are left in the old location
+			SYMPHONY_SRC_INC = $(COIN_OR)/SYMPHONY/SYMPHONY/include
+			APPLINCLS += -isystem $(SYMPHONY_SRC_INC) -isystem $(SYMPHONY_INC)
       APPLLIB += -L$(SYMPHONY_LIB) -lOsiSym -lSym
       CXXLINKFLAGS += -Wl,-rpath $(SYMPHONY_LIB)
 	endif

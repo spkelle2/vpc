@@ -430,3 +430,7 @@ double min(double a, double b);
 
 /** take a max of two values */
 double max(double a, double b);
+
+/** check if two solvers have the same coefficient matrix */
+bool sameCoefficientMatrix(const OsiSolverInterface* solver1, const OsiSolverInterface* solver2,
+                           const std::vector<double>* multipliers = nullptr);
