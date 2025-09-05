@@ -434,3 +434,9 @@ double max(double a, double b);
 /** check if two solvers have the same coefficient matrix */
 bool sameCoefficientMatrix(const OsiSolverInterface* solver1, const OsiSolverInterface* solver2,
                            const std::vector<double>* multipliers = nullptr);
+
+/** check if two solvers have the same objective coefficients */
+bool sameObjective(const OsiSolverInterface* solver1, const OsiSolverInterface* solver2);
+
+/** check if two solvers have the same constraint and variable bounds */
+bool sameBounds(const OsiSolverInterface* solver1, const OsiSolverInterface* solver2);

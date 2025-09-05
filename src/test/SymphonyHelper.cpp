@@ -20,7 +20,7 @@
 #include "CutHelper.hpp" // applyCuts
 #include "SolverHelper.hpp"
 #include "VPCParameters.hpp"
-
+#include "utility.hpp"
 
 using namespace VPCParametersNamespace;
 
@@ -129,6 +129,8 @@ std::shared_ptr<CoinWarmStart> doBranchAndBoundWithSymphony(
   sp_solution* sol = (sp_solution*)malloc(sizeof(sp_solution));
   sp_solution** solutions = (sp_solution**)malloc(sizeof(sp_solution*));
   sp_desc* pool = (sp_desc*)malloc(sizeof(sp_desc));
+  double obj_value;
+  bool provide_sol = (strategy > 0) && use_bb_option(strategy, BB_Strategy_Options::use_best_bound);
 
   // create models and get pointers to their environments
   OsiSymSolverInterface model;
@@ -185,7 +187,7 @@ std::shared_ptr<CoinWarmStart> doBranchAndBoundWithSymphony(
   setStrategyForBBTestSymphony(params, strategy, model);
 
   // set primal warm start if requested
-  if ((strategy > 0) && use_bb_option(strategy, BB_Strategy_Options::use_best_bound)) {
+  if (provide_sol) {
 
     // Check if user provides a solution file
     std::string solfile = params.get(stringParam::SOLFILE);
@@ -207,7 +209,7 @@ std::shared_ptr<CoinWarmStart> doBranchAndBoundWithSymphony(
     }
 
     // get the objective value of the solution
-    double obj_value = std::inner_product(vals.begin(), vals.end(), model.getObjCoefficients(), 0.0);
+    obj_value = std::inner_product(vals.begin(), vals.end(), model.getObjCoefficients(), 0.0);
 
     // put the solution into a Symphony solution structure
     sol->objval = obj_value;
@@ -239,6 +241,12 @@ std::shared_ptr<CoinWarmStart> doBranchAndBoundWithSymphony(
     model.initialSolve();
   }
 
+  // sanity check
+  if (greaterThanVal(env->tm->lb, env->tm->ub)){
+    warning_msg(warnstring, "Symphony gave bad dual bound of %f, using known primal optimal %f instead.",
+              env->tm->lb, env->tm->ub);
+  }
+
   // collect root statistics
   info.root_time = env->comp_times.readtime + env->comp_times.ub_overhead +
       env->comp_times.ub_heurtime + env->comp_times.lb_overhead +
@@ -247,15 +255,24 @@ std::shared_ptr<CoinWarmStart> doBranchAndBoundWithSymphony(
       env->tm->comp_times.separation + env->tm->comp_times.fixing +
       env->tm->comp_times.pricing + env->tm->comp_times.strong_branching +
       env->tm->comp_times.cut_pool + env->tm->comp_times.primal_heur;
-  info.last_cut_pass = env->tm->lb;
+  info.last_cut_pass = std::min(env->tm->lb, env->tm->ub); // sometimes symphony returns bad bounds
 
   // solve the branch-and-bound tree
   model.setSymParam("node_limit", -1);
   model.resolve();
 
+  // do some sanity checks on the result
+  if (greaterThanVal(env->tm->lb, env->tm->ub)){
+    warning_msg(warnstring, "Symphony gave bad dual bound of %f, using known primal optimal %f instead.",
+              env->tm->lb, env->tm->ub);
+  }
+  if (provide_sol){
+    verify(isVal(obj_value, env->tm->ub), "provided primal bound is not valid");
+  }
+
   // bounds
-  info.bound = env->tm->lb;
-  info.obj = env->tm->ub;
+  info.bound = std::min(env->tm->lb, env->tm->ub); // sometimes symphony returns bad bounds
+  info.obj = env->tm->ub; // ub should always match the best known integer solution
 
   // times
   info.time = env->comp_times.readtime + env->comp_times.ub_overhead +

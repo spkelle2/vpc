@@ -945,3 +945,74 @@ bool sameCoefficientMatrix(const OsiSolverInterface* solver1, const OsiSolverInt
 
   return true; // Matrices are identical
 }
+
+/** check if two solvers have the same objective coefficients */
+bool sameObjective(const OsiSolverInterface* solver1, const OsiSolverInterface* solver2){
+  // Check for null pointers
+  if (!solver1 || !solver2) {
+    std::cerr << "Error: One or both solver pointers are null." << std::endl;
+    return false;
+  }
+
+  // Compare dimensions
+  if (solver1->getNumCols() != solver2->getNumCols()) {
+    return false;
+  }
+
+  // Compare individual coefficients
+  const double* obj1 = solver1->getObjCoefficients();
+  const double* obj2 = solver2->getObjCoefficients();
+
+  for (int col = 0; col < solver1->getNumCols(); ++col) {
+    if (!isVal(obj1[col], obj2[col])) {
+      return false; // Different coefficient value
+    }
+  }
+
+  return true; // Objectives are identical
+}
+
+/** check if two solvers have the same constraint and variable bounds */
+bool sameBounds(const OsiSolverInterface* solver1, const OsiSolverInterface* solver2){
+  // Check for null pointers
+  if (!solver1 || !solver2) {
+    std::cerr << "Error: One or both solver pointers are null." << std::endl;
+    return false;
+  }
+
+  // Compare row bounds dimensions
+  if (solver1->getNumRows() != solver2->getNumRows()) {
+    return false;
+  }
+
+  // Compare individual row bounds
+  const double* rowLower1 = solver1->getRowLower();
+  const double* rowUpper1 = solver1->getRowUpper();
+  const double* rowLower2 = solver2->getRowLower();
+  const double* rowUpper2 = solver2->getRowUpper();
+
+  for (int row = 0; row < solver1->getNumRows(); ++row) {
+    if (!isVal(rowLower1[row], rowLower2[row]) || !isVal(rowUpper1[row], rowUpper2[row])) {
+      return false; // Different row bound value
+    }
+  }
+
+  // Compare column bounds dimensions
+  if (solver1->getNumCols() != solver2->getNumCols()) {
+    return false;
+  }
+
+  // Compare individual column bounds
+  const double* colLower1 = solver1->getColLower();
+  const double* colUpper1 = solver1->getColUpper();
+  const double* colLower2 = solver2->getColLower();
+  const double* colUpper2 = solver2->getColUpper();
+
+  for (int col = 0; col < solver1->getNumCols(); ++col) {
+    if (!isVal(colLower1[col], colLower2[col]) || !isVal(colUpper1[col], colUpper2[col])) {
+      return false; // Different column bound value
+    }
+  }
+
+  return true; // Bounds are identical
+}
