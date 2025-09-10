@@ -129,7 +129,7 @@ std::shared_ptr<CoinWarmStart> doBranchAndBoundWithSymphony(
   sp_solution* sol = (sp_solution*)malloc(sizeof(sp_solution));
   sp_solution** solutions = (sp_solution**)malloc(sizeof(sp_solution*));
   sp_desc* pool = (sp_desc*)malloc(sizeof(sp_desc));
-  double obj_value;
+  double obj_value = -std::numeric_limits<double>::max();
   bool provide_sol = (strategy > 0) && use_bb_option(strategy, BB_Strategy_Options::use_best_bound);
 
   // create models and get pointers to their environments
@@ -227,7 +227,11 @@ std::shared_ptr<CoinWarmStart> doBranchAndBoundWithSymphony(
     pool->solutions = solutions;
 
     // set the primal warm start
-    env->sp = pool;
+    if (ws_tmp){
+      env->sp = pool;  // set via solution pool when warm-start provided
+    } else {
+      model.setSymParam("upper_bound", obj_value);
+    }
   }
 
   // set dual warm start if requested
@@ -235,14 +239,10 @@ std::shared_ptr<CoinWarmStart> doBranchAndBoundWithSymphony(
 
   // solve root node
   model.setSymParam("node_limit", 1);  // getLowerBound
-  if (ws_tmp){
-    model.resolve();
-  } else {
-    model.initialSolve();
-  }
+  model.resolve();  // just defaults to initialSolve if no warm-start
 
   // sanity check
-  if (greaterThanVal(env->tm->lb, env->tm->ub)){
+  if (provide_sol && greaterThanVal(env->tm->lb, obj_value)){
     warning_msg(warnstring, "Symphony gave bad dual bound of %f, using known primal optimal %f instead.",
               env->tm->lb, env->tm->ub);
   }
@@ -267,7 +267,7 @@ std::shared_ptr<CoinWarmStart> doBranchAndBoundWithSymphony(
               env->tm->lb, env->tm->ub);
   }
   if (provide_sol){
-    verify(isVal(obj_value, env->tm->ub), "provided primal bound is not valid");
+    verify(isVal(obj_value, env->tm->ub), "Symphony found a different optimal objective than the one provided");
   }
 
   // bounds
@@ -285,8 +285,8 @@ std::shared_ptr<CoinWarmStart> doBranchAndBoundWithSymphony(
       info.root_time;  // symphony resets the tree manager on the resolve so add back in previous time
 
   // processing steps
-  info.nodes = env->tm->stat.analyzed;
-  info.iters = env->tm->lp_stat.lp_iter_num;
+  info.nodes = env->tm->stat.analyzed;  // 400
+  info.iters = env->tm->lp_stat.lp_iter_num;  // 3300
 
   // return the warm start in case we'd like to use it again
   std::shared_ptr<CoinWarmStart> ws_new = getWarmStartShared(model);
