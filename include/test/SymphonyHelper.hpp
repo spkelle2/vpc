@@ -25,10 +25,8 @@ void setStrategyForBBTestSymphony(const VPCParametersNamespace::VPCParameters& p
                                   const int strategy, OsiSymSolverInterface& model);
 
 // helper function to solve a MILP with Symphony
-std::shared_ptr<CoinWarmStart> doBranchAndBoundWithSymphony(
+void doBranchAndBoundWithSymphony(
     const VPCParametersNamespace::VPCParameters& params, int strategy,
-    const OsiSolverInterface* const si, BBInfo& info,
-    const OsiCuts* cuts = nullptr, const CoinWarmStart* ws = nullptr,
-    const OsiSolverInterface* const si_init = nullptr,
-    const OsiCuts* cuts_init = nullptr);
+    const OsiSolverInterface* const si, BBInfo& info, const OsiCuts* cuts,
+    std::shared_ptr<OsiSymSolverInterface>& parametric_model);
 #endif /* USE_SYMPHONY */
