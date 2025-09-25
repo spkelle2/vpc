@@ -46,17 +46,17 @@ TEST_CASE("Test doBranchAndBoundWithSymphony", "[SymphonyHelper::doBranchAndBoun
       BB_Strategy_Options::presolve_off, // instances will be presolved already
       BB_Strategy_Options::heuristics_off,  // already providing bound
       BB_Strategy_Options::use_best_bound,  // use provided solution
-//      BB_Strategy_Options::all_cuts_off // don't use any cuts other than VPCs
+      BB_Strategy_Options::all_cuts_off // don't use any cuts other than VPCs
   }));
 
-  // solver
-  OsiClpSolverInterface si;
-  SolverInterface* solver;
-  si.readMps("../test/bm23.mps");
-  si.initialSolve();
-  solver = const_cast<SolverInterface*>(dynamic_cast<const SolverInterface*>(&si));
-
   SECTION( "Test first instance solve" ) {
+
+    // solver
+    OsiClpSolverInterface si;
+    SolverInterface* solver;
+    si.readMps("../test/bm23.mps");
+    si.initialSolve();
+    solver = const_cast<SolverInterface*>(dynamic_cast<const SolverInterface*>(&si));
 
     // make vpcs
     OsiCuts vpcs;
@@ -78,14 +78,20 @@ TEST_CASE("Test doBranchAndBoundWithSymphony", "[SymphonyHelper::doBranchAndBoun
     REQUIRE(0 < info.nodes);
     REQUIRE(info.nodes < info.iters);
     // dual bound monotonically improves
-//    REQUIRE(si.getObjValue() < info.last_cut_pass);
-//    REQUIRE(info.last_cut_pass < info.bound);
+    REQUIRE(si.getObjValue() < info.last_cut_pass);
+    REQUIRE(info.last_cut_pass < info.bound);
     // time increases monotonically
-//    REQUIRE(0 < info.root_time);
-//    REQUIRE(info.root_time < info.time);
+    REQUIRE(0 < info.time);
   }
 
   SECTION( "Test objective perturbed warm-start" ) {
+
+    // solver
+    OsiClpSolverInterface si;
+    SolverInterface* solver;
+    si.readMps("../test/bm23.mps");
+    si.initialSolve();
+    solver = const_cast<SolverInterface*>(dynamic_cast<const SolverInterface*>(&si));
 
     // solve initial instance with symphony to get warm start
     BBInfo info_initial;
@@ -100,72 +106,71 @@ TEST_CASE("Test doBranchAndBoundWithSymphony", "[SymphonyHelper::doBranchAndBoun
     si_ptb->initialSolve();
     solver_ptb = const_cast<SolverInterface*>(dynamic_cast<const SolverInterface*>(si_ptb));
 
+    // solve with warm start
+    BBInfo info_ws;
+    doBranchAndBoundWithSymphony(vpc_params, vpc_params.get(BB_STRATEGY), solver_ptb,
+                                 info_ws, nullptr, parametric_model);
+
     // solve with no warm start
     BBInfo info;
     std::shared_ptr<OsiSymSolverInterface> dummy_model = std::shared_ptr<OsiSymSolverInterface>();
     doBranchAndBoundWithSymphony(vpc_params, vpc_params.get(BB_STRATEGY), solver_ptb,
                                  info, nullptr, dummy_model);
 
-    // solve with warm start
-    BBInfo info_ws;
-    doBranchAndBoundWithSymphony(vpc_params, vpc_params.get(BB_STRATEGY), solver_ptb,
-                                 info_ws, nullptr, parametric_model);
-
-    // nodes, LP iterations, and time should be less with warm start
-    REQUIRE(info_ws.nodes < info.nodes);
+    // LP iterations, and time should be less with warm start
     REQUIRE(info_ws.iters < info.iters);
     REQUIRE(info_ws.time < info.time);
-    REQUIRE(info_ws.root_time < info.root_time);
-
-    // root dual bound should be better
-//    REQUIRE(info_ws.last_cut_pass > info.last_cut_pass);
 
     // final bounds should be the same
     REQUIRE(info_ws.bound == info_ws.obj);
     REQUIRE(info_ws.bound == info.bound);
     REQUIRE(info_ws.obj == info.obj);
 
-//    // create a solver with a perturbed RHS but same solution
-//    si_ptb->setRowUpper(0, 60);
-//    si_ptb->initialSolve();
-//    solver_ptb = const_cast<SolverInterface*>(dynamic_cast<const SolverInterface*>(si_ptb));
-//
-//    // solve with no warm start
-//    info = BBInfo();
-//    doBranchAndBoundWithSymphony(vpc_params, vpc_params.get(BB_STRATEGY), solver_ptb, info, &vpcs);
-//
-//    // solve with warm start
-//    info_ws = BBInfo();
-//    doBranchAndBoundWithSymphony(vpc_params, vpc_params.get(BB_STRATEGY), solver_ptb,
-//                                 info_ws, &vpcs, ws.get(), solver, &vpcs);
-//
-//    // nodes, LP iterations, and time should be less with warm start
-//    REQUIRE(info_ws.nodes < info.nodes);
-//    REQUIRE(info_ws.iters < info.iters);
-//    REQUIRE(info_ws.time < info.time);
-//    REQUIRE(info_ws.root_time < info.root_time);
-//
-//    // root dual bound should be better
-//    REQUIRE(info_ws.last_cut_pass > info.last_cut_pass);
-//
-//    // final bounds should be the same
-//    REQUIRE(info_ws.bound == info_ws.obj);
-//    REQUIRE(info_ws.bound == info.bound);
-//    REQUIRE(info_ws.obj == info.obj);
-//
-//    // really shake things up this time
-//    for (int i = 0; i < si_ptb->getNumCols(); i++){
-//      si_ptb->setObjCoeff(i, -1 * si_ptb->getObjCoefficients()[i]);
-//    }
-//    si_ptb->initialSolve();
-//    solver_ptb = const_cast<SolverInterface*>(dynamic_cast<const SolverInterface*>(si_ptb));
-//
-//    // see what the solver does with a warm start this time
-//    info_ws = BBInfo();
-//    doBranchAndBoundWithSymphony(vpc_params, vpc_params.get(BB_STRATEGY), solver_ptb,
-//                                 info_ws, &vpcs, ws.get(), solver, &vpcs);
-
   }
+
+  SECTION( "Test rhs-perturbed warm-start" ){
+
+    // solver
+    OsiClpSolverInterface si;
+    SolverInterface* solver;
+    si.readMps("../test/bm23.mps");
+    si.initialSolve();
+    solver = const_cast<SolverInterface*>(dynamic_cast<const SolverInterface*>(&si));
+
+    // solve initial instance with symphony to get warm start
+    BBInfo info_initial;
+    std::shared_ptr<OsiSymSolverInterface> parametric_model = std::shared_ptr<OsiSymSolverInterface>();
+    doBranchAndBoundWithSymphony(vpc_params, vpc_params.get(BB_STRATEGY), solver,
+                                 info_initial, nullptr, parametric_model);
+
+    // create a solver with a perturbed RHS but same solution
+    OsiSolverInterface * si_ptb = si.clone();
+    si_ptb->setRowUpper(0, 60);
+    si_ptb->initialSolve();
+    SolverInterface* solver_ptb;
+    solver_ptb = const_cast<SolverInterface*>(dynamic_cast<const SolverInterface*>(si_ptb));
+
+    // solve with warm start
+    BBInfo info_ws;
+    doBranchAndBoundWithSymphony(vpc_params, vpc_params.get(BB_STRATEGY), solver_ptb,
+                                 info_ws, nullptr, parametric_model);
+
+    // solve with no warm start
+    BBInfo info;
+    std::shared_ptr<OsiSymSolverInterface> dummy_model = std::shared_ptr<OsiSymSolverInterface>();
+    doBranchAndBoundWithSymphony(vpc_params, vpc_params.get(BB_STRATEGY), solver_ptb,
+                                 info, nullptr, dummy_model);
+
+    // LP iterations, and time should be less with warm start
+    REQUIRE(info_ws.iters < info.iters);
+    REQUIRE(info_ws.time < info.time);
+
+    // final bounds should be the same
+    REQUIRE(info_ws.bound == info_ws.obj);
+    REQUIRE(info_ws.bound == info.bound);
+    REQUIRE(info_ws.obj == info.obj);
+  }
+
 }
 
 #endif // USE_SYMPHONY

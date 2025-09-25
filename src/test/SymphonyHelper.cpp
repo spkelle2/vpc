@@ -88,7 +88,7 @@ void setStrategyForBBTestSymphony(const VPCParameters& params, const int strateg
   model->setSymParam("do_reduced_cost_fixing", false);
 }
 
-// todo update to use SolverInterface instead of OsiSolverInterface
+// no getting around providing OsiSymSolverInterface, passing just a warm start does not work
 void doBranchAndBoundWithSymphony(
     const VPCParameters& params, int strategy, const OsiSolverInterface* const si,
     BBInfo& info, const OsiCuts* cuts, std::shared_ptr<OsiSymSolverInterface>& parametric_model) {
