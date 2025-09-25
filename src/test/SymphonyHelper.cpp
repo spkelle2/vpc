@@ -98,8 +98,51 @@ void doBranchAndBoundWithSymphony(
   std::string f_name;
   createTmpFileCopy(params, si, f_name);
   input_model->readMps(f_name.c_str());
+
+  // input cuts in a standardized <= sense if provided
+  OsiCuts cuts_std;
   if (cuts && cuts->sizeCuts() > 0) {
-    input_model->applyCuts(*cuts);
+    // Flip sense of cuts to be <= so that Symphony doesn't complain about changes
+    // Symphony internally stores all constraints as <=
+    for (int i = 0; i < cuts->sizeRowCuts(); i++) {
+      const OsiRowCut *oldCut = cuts->rowCutPtr(i);
+
+      double lb = oldCut->lb();
+      double ub = oldCut->ub();
+
+      // If it has a finite lower bound, flip to <= form
+      bool flipped = false;
+      if (lb > -COIN_DBL_MAX) {
+        ub = -lb;               // new upper bound
+        lb = -COIN_DBL_MAX;     // no lower bound
+        flipped = true;
+      }
+
+      // Copy row vector
+      const CoinPackedVector &oldRow = oldCut->row();
+      const int *indices   = oldRow.getIndices();
+      const double *values = oldRow.getElements();
+      int n = oldRow.getNumElements();
+
+      CoinPackedVector newRow;
+      for (int j = 0; j < n; ++j) {
+        double val = values[j];
+        if (flipped) {
+          val = -val;  // flip coefficients
+        }
+        newRow.insert(indices[j], val);
+      }
+
+      // Construct new cut
+      OsiRowCut newCut;
+      newCut.setLb(lb);
+      newCut.setUb(ub);
+      newCut.setRow(newRow);
+
+      cuts_std.insert(newCut);
+    }
+
+    input_model->applyCuts(cuts_std);
   }
 
   // if provided a parametric model, modify it to match input_model
