@@ -93,8 +93,8 @@ then
   ./coinbrew build Cbc -b build -p build --no-prompt ADD_CXXFLAGS="-DSAVE_NODE_INFO" --tests none
   ./coinbrew build Cbc -b buildg -p buildg --no-prompt --enable-debug ADD_CXXFLAGS="-DSAVE_NODE_INFO" --tests none
   # if on OSX and building with clang, may need to add below --disable-openmp
-  ./coinbrew build SYMPHONY -b build -p build --no-prompt --skip-dependencies --tests none
-  ./coinbrew build SYMPHONY -b buildg -p buildg --no-prompt --enable-debug --skip-dependencies --tests none
+  #  ./coinbrew build SYMPHONY -b build -p build --no-prompt --skip-dependencies --tests none --disable-openmp
+  #  ./coinbrew build SYMPHONY -b buildg -p buildg --no-prompt --enable-debug --skip-dependencies --tests none --disable-openmp
 else
   ## Ignore below unless you wish to use OsiCpxSolverInterface
   #UNAME=`uname`

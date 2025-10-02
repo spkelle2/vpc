@@ -93,6 +93,17 @@ void doBranchAndBoundWithSymphony(
     const VPCParameters& params, int strategy, const OsiSolverInterface* const si,
     BBInfo& info, const OsiCuts* cuts, std::shared_ptr<OsiSymSolverInterface>& parametric_model) {
 
+  // create solution and pool containers in case needed later
+  // this needs to happen before we create the model so they still exist when
+  // model destructor cleans them up
+  int * xind = (int*)malloc(si->getNumCols() * sizeof(int));
+  double * xval = (double*)malloc(si->getNumCols() * sizeof(double));
+  sp_solution* sol = (sp_solution*)malloc(sizeof(sp_solution));
+  sp_solution** solutions = (sp_solution**)malloc(sizeof(sp_solution*));
+  sp_desc* pool = (sp_desc*)malloc(sizeof(sp_desc));
+  double obj_value = -std::numeric_limits<double>::max();
+  bool provide_sol = (strategy > 0) && use_bb_option(strategy, BB_Strategy_Options::use_best_bound);
+
   // create a Symphony model for the input problem si
   std::shared_ptr<OsiSymSolverInterface> input_model = std::make_shared<OsiSymSolverInterface>();
   std::string f_name;
@@ -186,6 +197,50 @@ void doBranchAndBoundWithSymphony(
 
   // set strategy parameters
   setStrategyForBBTestSymphony(params, strategy, parametric_model);
+
+  // set primal warm start if requested
+  if (provide_sol) {
+
+    // Check if user provides a solution file
+    std::string solfile = params.get(stringParam::SOLFILE);
+    verify((solfile.size() > 4) && (solfile.compare(solfile.size() - 4, 4, ".sol") == 0),
+           "VPC requires a .sol file to primal warm-start Symphony");
+
+    // read in the solution file
+    std::vector<double> vals;
+    getSolFromFile(solfile.c_str(), vals);
+
+    // check that the solution is valid
+    verify(vals.size() == parametric_model->getNumCols(), "solution has wrong dimension");
+    verify(isFeasible(*parametric_model.get(), vals, false), "solution is not feasible");
+
+    // copy it over to C-style arrays for Symphony
+    for (int i = 0; i < vals.size(); i++) {
+      xind[i] = i;
+      xval[i] = vals[i];
+    }
+
+    // get the objective value of the solution
+    obj_value = std::inner_product(vals.begin(), vals.end(), parametric_model->getObjCoefficients(), 0.0);
+
+    // put the solution into a Symphony solution structure
+    sol->objval = obj_value;
+    sol->xlength = parametric_model->getNumCols();
+    sol->xind = xind;
+    sol->xval = xval;
+    sol->node_index = 0;
+    sol->node_level = 0;
+
+    // create a solution pool from solution
+    pool->max_solutions = 1;  // only keep best solution in the pool - we don't really care
+    pool->num_solutions = 1;
+    pool->total_num_sols_found = 1;
+    solutions[0] = sol;
+    pool->solutions = solutions;
+
+    // add the solution pool to the symphony environment
+    env->sp = pool;
+  }
 
   // solve the branch-and-bound tree
   parametric_model->resolve();
