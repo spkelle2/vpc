@@ -101,8 +101,9 @@ void doBranchAndBoundWithSymphony(
   sp_solution* sol = (sp_solution*)malloc(sizeof(sp_solution));
   sp_solution** solutions = (sp_solution**)malloc(sizeof(sp_solution*));
   sp_desc* pool = (sp_desc*)malloc(sizeof(sp_desc));
-  double obj_value = -std::numeric_limits<double>::max();
+  double obj_value = std::numeric_limits<double>::max();
   bool provide_sol = (strategy > 0) && use_bb_option(strategy, BB_Strategy_Options::use_best_bound);
+  bool provide_parametric = (parametric_model != nullptr);
 
   // create a Symphony model for the input problem si
   std::shared_ptr<OsiSymSolverInterface> input_model = std::make_shared<OsiSymSolverInterface>();
@@ -242,27 +243,53 @@ void doBranchAndBoundWithSymphony(
     env->sp = pool;
   }
 
-  // solve the branch-and-bound tree
+  // process just the first node to start
+  parametric_model->setSymParam("node_limit", 1);
   parametric_model->resolve();
 
-  // bounds
-  info.last_cut_pass = env->tm->stat.root_lb;
-  info.bound = std::min(env->tm->lb, env->tm->ub); // sometimes symphony returns bad bounds
-  info.obj = env->tm->ub; // ub should always match the best known integer solution
+  // capture first node specific stats
+  info.last_cut_pass = env->tm->lb;
+  info.root_time = env->comp_times.readtime + env->comp_times.ub_overhead +
+    env->comp_times.ub_heurtime + env->comp_times.lb_overhead +
+    env->comp_times.lb_heurtime + env->tm->comp_times.communication +
+    env->tm->comp_times.lp + env->tm->comp_times.lp_setup +
+    env->tm->comp_times.separation + env->tm->comp_times.fixing +
+    env->tm->comp_times.pricing + env->tm->comp_times.strong_branching +
+    env->tm->comp_times.cut_pool + env->tm->comp_times.primal_heur;
 
-  // times
-  info.time = env->comp_times.readtime + env->comp_times.ub_overhead +
-      env->comp_times.ub_heurtime + env->comp_times.lb_overhead +
-      env->comp_times.lb_heurtime + env->tm->comp_times.communication +
-      env->tm->comp_times.lp + env->tm->comp_times.lp_setup +
-      env->tm->comp_times.separation + env->tm->comp_times.fixing +
-      env->tm->comp_times.pricing + env->tm->comp_times.strong_branching +
-      env->tm->comp_times.cut_pool + env->tm->comp_times.primal_heur +
-      info.root_time;  // symphony resets the tree manager on the resolve so add back in previous time
-
-  // processing steps
-  info.nodes = env->tm->stat.analyzed;
+  // time and iterations are reset on resolve, so capture their first node values
   info.iters = env->tm->lp_stat.lp_iter_num;
+  info.time = info.root_time;
+
+  // solve the branch-and-bound tree if not already optimal
+  parametric_model->setSymParam("node_limit", -1);
+  double ub = env->tm->ub != 0 ? env->tm->ub : obj_value;
+  if (ub == std::numeric_limits<double>::max() ||
+      std::abs(env->tm->lb - ub)/std::abs(ub) > 1e-4) {
+
+    // we're not already optimal so solve to optimality
+    parametric_model->resolve();
+
+    // record the total time
+    info.time += env->comp_times.readtime + env->comp_times.ub_overhead +
+        env->comp_times.ub_heurtime + env->comp_times.lb_overhead +
+        env->comp_times.lb_heurtime + env->tm->comp_times.communication +
+        env->tm->comp_times.lp + env->tm->comp_times.lp_setup +
+        env->tm->comp_times.separation + env->tm->comp_times.fixing +
+        env->tm->comp_times.pricing + env->tm->comp_times.strong_branching +
+        env->tm->comp_times.cut_pool + env->tm->comp_times.primal_heur;
+
+    // iterations reset on resolve, so add them together
+    info.iters += env->tm->lp_stat.lp_iter_num;
+  }
+
+  // bounds
+  info.bound = env->tm->lb;
+  // if we don't have a primal bound to report, use the provided bound
+  info.obj = env->tm->ub != 0 ? env->tm->ub : obj_value;
+
+  // nodes - they're cumulative across resolves so no special handling
+  info.nodes = env->tm->stat.analyzed;
 
   // remove temporary files from createTmpFileCopy
   std::string f_name_no_ext = f_name.substr(0, f_name.size() - 4);

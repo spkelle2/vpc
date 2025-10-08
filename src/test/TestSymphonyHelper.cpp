@@ -81,10 +81,13 @@ TEST_CASE("Test doBranchAndBoundWithSymphony", "[SymphonyHelper::doBranchAndBoun
     REQUIRE(si.getObjValue() < info.last_cut_pass);
     REQUIRE(info.last_cut_pass < info.bound);
     // time increases monotonically
-    REQUIRE(0 < info.time);
+    REQUIRE(0 < info.root_time);
+    REQUIRE(info.root_time < info.time);
   }
 
   SECTION( "Test objective perturbed warm-start" ) {
+
+    // small changes should result in warm-start being effective
 
     // solver
     OsiClpSolverInterface si;
@@ -117,18 +120,22 @@ TEST_CASE("Test doBranchAndBoundWithSymphony", "[SymphonyHelper::doBranchAndBoun
     doBranchAndBoundWithSymphony(vpc_params, vpc_params.get(BB_STRATEGY), solver_ptb,
                                  info, nullptr, dummy_model);
 
-    // LP iterations, and time should be less with warm start
+    // LP iterations and time should be less with warm start
     REQUIRE(info_ws.iters < info.iters);
     REQUIRE(info_ws.time < info.time);
+
+    // root dual bound should be better with warm start
+    REQUIRE(info.last_cut_pass <= info_ws.last_cut_pass);
 
     // final bounds should be the same
     REQUIRE(info_ws.bound == info_ws.obj);
     REQUIRE(info_ws.bound == info.bound);
     REQUIRE(info_ws.obj == info.obj);
-
   }
 
   SECTION( "Test rhs-perturbed warm-start" ){
+
+    // small changes should result in warm-start being effective
 
     // solver
     OsiClpSolverInterface si;
@@ -161,14 +168,115 @@ TEST_CASE("Test doBranchAndBoundWithSymphony", "[SymphonyHelper::doBranchAndBoun
     doBranchAndBoundWithSymphony(vpc_params, vpc_params.get(BB_STRATEGY), solver_ptb,
                                  info, nullptr, dummy_model);
 
-    // LP iterations, and time should be less with warm start
+    // LP iterations and time should be less with warm start
     REQUIRE(info_ws.iters < info.iters);
     REQUIRE(info_ws.time < info.time);
+
+    // root dual bound should be better with warm start
+    REQUIRE(info.last_cut_pass <= info_ws.last_cut_pass);
 
     // final bounds should be the same
     REQUIRE(info_ws.bound == info_ws.obj);
     REQUIRE(info_ws.bound == info.bound);
     REQUIRE(info_ws.obj == info.obj);
+  }
+
+  SECTION( "Test warm-start lower bound for objective changes" ) {
+
+    // solver
+    OsiClpSolverInterface si;
+    SolverInterface* solver;
+    si.readMps("../test/bm23.mps");
+    si.initialSolve();
+    solver = const_cast<SolverInterface*>(dynamic_cast<const SolverInterface*>(&si));
+
+    // solve initial instance with symphony to get warm start
+    BBInfo info_initial;
+    std::shared_ptr<OsiSymSolverInterface> parametric_model = std::shared_ptr<OsiSymSolverInterface>();
+    doBranchAndBoundWithSymphony(vpc_params, vpc_params.get(BB_STRATEGY), solver,
+                                 info_initial, nullptr, parametric_model);
+
+    // create a solver with a perturbed objective to force a different, but previously found solution
+    OsiSolverInterface * si_ptb = si.clone();
+    for (int i = 0; i < si_ptb->getNumCols(); i++){
+      si_ptb->setObjCoeff(i, -1 * si_ptb->getObjCoefficients()[i]);
+    }
+    SolverInterface* solver_ptb;
+    si_ptb->initialSolve();
+    solver_ptb = const_cast<SolverInterface*>(dynamic_cast<const SolverInterface*>(si_ptb));
+
+    // solve with warm start
+    BBInfo info_ws;
+    doBranchAndBoundWithSymphony(vpc_params, vpc_params.get(BB_STRATEGY), solver_ptb,
+                                 info_ws, nullptr, parametric_model);
+
+    // check that we're optimal
+    REQUIRE(info_ws.obj == info_ws.bound);
+    REQUIRE(info_ws.bound == -93);
+
+    // dual bound and time monotonically improve
+    REQUIRE(si_ptb->getObjValue() < info_ws.last_cut_pass); // -97, -96
+    REQUIRE(info_ws.last_cut_pass < info_ws.bound);
+    REQUIRE(0 < info_ws.root_time);
+    REQUIRE(info_ws.root_time < info_ws.time);
+
+    // time, nodes, and iterations should be non-zero
+    REQUIRE(0 < info_ws.time);
+    REQUIRE(0 < info_ws.iters);
+    REQUIRE(0 < info_ws.nodes);
+  }
+
+  SECTION( "Test warm-start lower bound for RHS changes" ) {
+
+    vpc_params.set(VPCParametersNamespace::SOLFILE, "../test/bm23_rhs.sol");
+
+    // solver
+    OsiClpSolverInterface si;
+    SolverInterface* solver;
+    si.readMps("../test/bm23.mps");
+    si.initialSolve();
+    solver = const_cast<SolverInterface*>(dynamic_cast<const SolverInterface*>(&si));
+
+    // solve initial instance with symphony to get warm start
+    BBInfo info_initial;
+    std::shared_ptr<OsiSymSolverInterface> parametric_model = std::shared_ptr<OsiSymSolverInterface>();
+    doBranchAndBoundWithSymphony(vpc_params, vpc_params.get(BB_STRATEGY), solver,
+                                 info_initial, nullptr, parametric_model);
+
+    // create a solver with a perturbed objective to force a different, but previously found solution
+    OsiSolverInterface * si_ptb = si.clone();
+    std::vector<int> constraint_idxs = {4, 8, 15};
+    for (int i = 0; i < si_ptb->getNumRows(); i++){
+      if (std::find(constraint_idxs.begin(), constraint_idxs.end(), i) != constraint_idxs.end()){
+        si_ptb->setRowUpper(i, si_ptb->getRowUpper()[i] - 4);
+      } else {
+        si_ptb->setRowUpper(i, si_ptb->getRowUpper()[i] - 7);
+      }
+    }
+    SolverInterface* solver_ptb;
+    si_ptb->initialSolve(); // 43.41 LP objective
+    solver_ptb = const_cast<SolverInterface*>(dynamic_cast<const SolverInterface*>(si_ptb));
+
+    // solve with warm start - disjunctive dual bound was 32.59 for initial problem
+    BBInfo info_ws;
+    doBranchAndBoundWithSymphony(vpc_params, vpc_params.get(BB_STRATEGY), solver_ptb,
+                                 info_ws, nullptr, parametric_model);
+
+    // check that we're optimal
+    REQUIRE(info_ws.obj == info_ws.bound);
+    REQUIRE(info_ws.bound == 63);
+
+    // dual bound and time monotonically improve
+    // main test here is just finding a gap at last cut pass (i.e. after root node)
+    REQUIRE(si_ptb->getObjValue() < info_ws.last_cut_pass);  // 43, 51
+    REQUIRE(info_ws.last_cut_pass < info_ws.bound);
+    REQUIRE(0 < info_ws.root_time);
+    REQUIRE(info_ws.root_time < info_ws.time);
+
+    // time, nodes, and iterations should be non-zero
+    REQUIRE(0 < info_ws.time);
+    REQUIRE(0 < info_ws.iters);
+    REQUIRE(0 < info_ws.nodes);
   }
 
 }
