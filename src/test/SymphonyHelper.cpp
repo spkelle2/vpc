@@ -39,7 +39,7 @@ void setStrategyForBBTestSymphony(const VPCParameters& params, const int strateg
 
   // set parameters
   int seed = params.get(intParam::RANDOM_SEED);
-  if (seed >= 0) model->setSymParam("random_seed", seed);
+  if (seed >= 0) model->setSymParam("random_seed", 42);
 
   // ---- Always-set basics ----
   model->setSymParam("time_limit", params.get(doubleParam::BB_TIMELIMIT));
@@ -189,6 +189,12 @@ void doBranchAndBoundWithSymphony(
         parametric_model->setRowUpper(i, input_model->getRowUpper()[i]);
       }
     }
+
+    // clear out old stats
+    sym_environment * env = parametric_model->getSymphonyEnvironment();
+    env->warm_start->lp_stat = lp_stat_desc();
+    env->warm_start->stat = problem_stat();
+    env->warm_start->comp_times = node_times();
   } else {
     // otherwise this will be our base instance for the parametric model, so just copy it over
     parametric_model = input_model;
@@ -256,10 +262,8 @@ void doBranchAndBoundWithSymphony(
     env->tm->comp_times.separation + env->tm->comp_times.fixing +
     env->tm->comp_times.pricing + env->tm->comp_times.strong_branching +
     env->tm->comp_times.cut_pool + env->tm->comp_times.primal_heur;
-
-  // time and iterations are reset on resolve, so capture their first node values
-  info.iters = env->tm->lp_stat.lp_iter_num;
-  info.time = info.root_time;
+  info.root_iters =  env->tm->lp_stat.lp_iter_num;
+  info.root_passes = env->tm->stat.analyzed;  // represents nodes processed so far
 
   // solve the branch-and-bound tree if not already optimal
   parametric_model->setSymParam("node_limit", -1);
@@ -269,18 +273,6 @@ void doBranchAndBoundWithSymphony(
 
     // we're not already optimal so solve to optimality
     parametric_model->resolve();
-
-    // record the total time
-    info.time += env->comp_times.readtime + env->comp_times.ub_overhead +
-        env->comp_times.ub_heurtime + env->comp_times.lb_overhead +
-        env->comp_times.lb_heurtime + env->tm->comp_times.communication +
-        env->tm->comp_times.lp + env->tm->comp_times.lp_setup +
-        env->tm->comp_times.separation + env->tm->comp_times.fixing +
-        env->tm->comp_times.pricing + env->tm->comp_times.strong_branching +
-        env->tm->comp_times.cut_pool + env->tm->comp_times.primal_heur;
-
-    // iterations reset on resolve, so add them together
-    info.iters += env->tm->lp_stat.lp_iter_num;
   }
 
   // bounds
@@ -290,6 +282,18 @@ void doBranchAndBoundWithSymphony(
 
   // nodes - they're cumulative across resolves so no special handling
   info.nodes = env->tm->stat.analyzed;
+
+  // iterations - also cumulative across reesolves
+  info.iters = env->tm->lp_stat.lp_iter_num;
+
+  // total time
+  info.time = env->comp_times.readtime + env->comp_times.ub_overhead +
+    env->comp_times.ub_heurtime + env->comp_times.lb_overhead +
+    env->comp_times.lb_heurtime + env->tm->comp_times.communication +
+    env->tm->comp_times.lp + env->tm->comp_times.lp_setup +
+    env->tm->comp_times.separation + env->tm->comp_times.fixing +
+    env->tm->comp_times.pricing + env->tm->comp_times.strong_branching +
+    env->tm->comp_times.cut_pool + env->tm->comp_times.primal_heur;
 
   // remove temporary files from createTmpFileCopy
   std::string f_name_no_ext = f_name.substr(0, f_name.size() - 4);

@@ -83,6 +83,12 @@ TEST_CASE("Test doBranchAndBoundWithSymphony", "[SymphonyHelper::doBranchAndBoun
     // time increases monotonically
     REQUIRE(0 < info.root_time);
     REQUIRE(info.root_time < info.time);
+    // nodes increase monotonically
+    REQUIRE(0 < info.root_passes);
+    REQUIRE(info.root_passes <= info.nodes);
+    // iterations increase monotonically
+    REQUIRE(0 < info.root_iters);
+    REQUIRE(info.root_iters <= info.iters);
   }
 
   SECTION( "Test objective perturbed warm-start" ) {
@@ -120,9 +126,21 @@ TEST_CASE("Test doBranchAndBoundWithSymphony", "[SymphonyHelper::doBranchAndBoun
     doBranchAndBoundWithSymphony(vpc_params, vpc_params.get(BB_STRATEGY), solver_ptb,
                                  info, nullptr, dummy_model);
 
-    // LP iterations and time should be less with warm start
-    REQUIRE(info_ws.iters < info.iters);
-    REQUIRE(info_ws.time < info.time);
+    // check monotonicity for warm start solve
+    // time increases monotonically
+    REQUIRE(0 < info_ws.root_time);
+    REQUIRE(info_ws.root_time <= info_ws.time);
+    // nodes increase monotonically
+    REQUIRE(0 < info_ws.root_passes);
+    REQUIRE(info_ws.root_passes <= info_ws.nodes);
+    // iterations increase monotonically
+    REQUIRE(0 < info_ws.root_iters);
+    REQUIRE(info_ws.root_iters <= info_ws.iters);
+
+    // warm start should improve performance beyond the root node
+    REQUIRE(info_ws.iters - info_ws.root_iters < info.iters);
+    REQUIRE(info_ws.time - info_ws.root_time < info.time);
+    REQUIRE(info_ws.nodes - info_ws.root_passes < info.nodes);
 
     // root dual bound should be better with warm start
     REQUIRE(info.last_cut_pass <= info_ws.last_cut_pass);
@@ -168,9 +186,21 @@ TEST_CASE("Test doBranchAndBoundWithSymphony", "[SymphonyHelper::doBranchAndBoun
     doBranchAndBoundWithSymphony(vpc_params, vpc_params.get(BB_STRATEGY), solver_ptb,
                                  info, nullptr, dummy_model);
 
-    // LP iterations and time should be less with warm start
-    REQUIRE(info_ws.iters < info.iters);
-    REQUIRE(info_ws.time < info.time);
+    // check monotonicity for warm start solve
+    // time increases monotonically
+    REQUIRE(0 < info_ws.root_time);
+    REQUIRE(info_ws.root_time <= info_ws.time);
+    // nodes increase monotonically
+    REQUIRE(0 < info_ws.root_passes);
+    REQUIRE(info_ws.root_passes <= info_ws.nodes);
+    // iterations increase monotonically
+    REQUIRE(0 < info_ws.root_iters);
+    REQUIRE(info_ws.root_iters <= info_ws.iters);
+
+    // warm start should improve performance beyond the root node
+    REQUIRE(info_ws.iters - info_ws.root_iters < info.iters);
+    REQUIRE(info_ws.time - info_ws.root_time < info.time);
+    REQUIRE(info_ws.nodes - info_ws.root_passes < info.nodes);
 
     // root dual bound should be better with warm start
     REQUIRE(info.last_cut_pass <= info_ws.last_cut_pass);
@@ -217,13 +247,17 @@ TEST_CASE("Test doBranchAndBoundWithSymphony", "[SymphonyHelper::doBranchAndBoun
     // dual bound and time monotonically improve
     REQUIRE(si_ptb->getObjValue() < info_ws.last_cut_pass); // -97, -96
     REQUIRE(info_ws.last_cut_pass < info_ws.bound);
-    REQUIRE(0 < info_ws.root_time);
-    REQUIRE(info_ws.root_time < info_ws.time);
 
-    // time, nodes, and iterations should be non-zero
-    REQUIRE(0 < info_ws.time);
-    REQUIRE(0 < info_ws.iters);
-    REQUIRE(0 < info_ws.nodes);
+    // check monotonicity for warm start solve
+    // time increases monotonically
+    REQUIRE(0 < info_ws.root_time);
+    REQUIRE(info_ws.root_time <= info_ws.time);
+    // nodes increase monotonically
+    REQUIRE(0 < info_ws.root_passes);
+    REQUIRE(info_ws.root_passes <= info_ws.nodes);
+    // iterations increase monotonically
+    REQUIRE(0 < info_ws.root_iters);
+    REQUIRE(info_ws.root_iters <= info_ws.iters);
   }
 
   SECTION( "Test warm-start lower bound for RHS changes" ) {
@@ -270,13 +304,16 @@ TEST_CASE("Test doBranchAndBoundWithSymphony", "[SymphonyHelper::doBranchAndBoun
     // main test here is just finding a gap at last cut pass (i.e. after root node)
     REQUIRE(si_ptb->getObjValue() < info_ws.last_cut_pass);  // 43, 51
     REQUIRE(info_ws.last_cut_pass < info_ws.bound);
+    // check monotonicity for warm start solve
+    // time increases monotonically
     REQUIRE(0 < info_ws.root_time);
-    REQUIRE(info_ws.root_time < info_ws.time);
-
-    // time, nodes, and iterations should be non-zero
-    REQUIRE(0 < info_ws.time);
-    REQUIRE(0 < info_ws.iters);
-    REQUIRE(0 < info_ws.nodes);
+    REQUIRE(info_ws.root_time <= info_ws.time);
+    // nodes increase monotonically
+    REQUIRE(0 < info_ws.root_passes);
+    REQUIRE(info_ws.root_passes <= info_ws.nodes);
+    // iterations increase monotonically
+    REQUIRE(0 < info_ws.root_iters);
+    REQUIRE(info_ws.root_iters <= info_ws.iters);
   }
 
 }
