@@ -107,9 +107,11 @@ void doBranchAndBoundWithSymphony(
 
   // create a Symphony model for the input problem si
   std::shared_ptr<OsiSymSolverInterface> input_model = std::make_shared<OsiSymSolverInterface>();
+  std::shared_ptr<OsiSymSolverInterface> root_model = std::make_shared<OsiSymSolverInterface>();
   std::string f_name;
   createTmpFileCopy(params, si, f_name);
   input_model->readMps(f_name.c_str());
+  root_model->readMps(f_name.c_str());
 
   // input cuts in a standardized <= sense if provided
   OsiCuts cuts_std;
@@ -200,10 +202,20 @@ void doBranchAndBoundWithSymphony(
     parametric_model = input_model;
   }
 
+  // get pointer to sym environments for later use
   sym_environment * env = parametric_model->getSymphonyEnvironment();
+  sym_environment * root_env = root_model->getSymphonyEnvironment();
 
   // set strategy parameters
   setStrategyForBBTestSymphony(params, strategy, parametric_model);
+  setStrategyForBBTestSymphony(params, strategy, root_model);
+
+  // copy over warm start from the parametric model to the root model
+  if (env->warm_start){
+    root_env->warm_start = create_copy_warm_start(env->warm_start);
+    root_env->warm_start->force_resolve_tree = true;  // resolve the tree to get the correct bound
+    root_env->mip = create_copy_mip_desc(env->mip);
+  }
 
   // set primal warm start if requested
   if (provide_sol) {
@@ -249,12 +261,16 @@ void doBranchAndBoundWithSymphony(
     env->sp = pool;
   }
 
-  // process just the first node to start
+  // resolve each node in the tree to get the bound
+  root_model->setSymParam("node_limit", 1);
+  root_model->resolve();
+  info.last_cut_pass = root_env->tm->lb;
+
+  // process just the first node (without resolving the tree to get the correct time info) to start
   parametric_model->setSymParam("node_limit", 1);
   parametric_model->resolve();
 
   // capture first node specific stats
-  info.last_cut_pass = env->tm->lb;
   info.root_time = env->comp_times.readtime + env->comp_times.ub_overhead +
     env->comp_times.ub_heurtime + env->comp_times.lb_overhead +
     env->comp_times.lb_heurtime + env->tm->comp_times.communication +

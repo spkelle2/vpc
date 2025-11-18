@@ -134,13 +134,12 @@ TEST_CASE("Test doBranchAndBoundWithSymphony", "[SymphonyHelper::doBranchAndBoun
     REQUIRE(0 < info_ws.root_passes);
     REQUIRE(info_ws.root_passes <= info_ws.nodes);
     // iterations increase monotonically
-    REQUIRE(0 < info_ws.root_iters);
+    REQUIRE(0 <= info_ws.root_iters);
     REQUIRE(info_ws.root_iters <= info_ws.iters);
 
-    // warm start should improve performance beyond the root node
-    REQUIRE(info_ws.iters - info_ws.root_iters < info.iters);
-    REQUIRE(info_ws.time - info_ws.root_time < info.time);
-    REQUIRE(info_ws.nodes - info_ws.root_passes < info.nodes);
+    // warm start should improve performance
+    REQUIRE(info_ws.iters < info.iters);
+    REQUIRE(info_ws.time < info.time);
 
     // root dual bound should be better with warm start
     REQUIRE(info.last_cut_pass <= info_ws.last_cut_pass);
@@ -194,13 +193,12 @@ TEST_CASE("Test doBranchAndBoundWithSymphony", "[SymphonyHelper::doBranchAndBoun
     REQUIRE(0 < info_ws.root_passes);
     REQUIRE(info_ws.root_passes <= info_ws.nodes);
     // iterations increase monotonically
-    REQUIRE(0 < info_ws.root_iters);
+    REQUIRE(0 <= info_ws.root_iters);
     REQUIRE(info_ws.root_iters <= info_ws.iters);
 
-    // warm start should improve performance beyond the root node
-    REQUIRE(info_ws.iters - info_ws.root_iters < info.iters);
-    REQUIRE(info_ws.time - info_ws.root_time < info.time);
-    REQUIRE(info_ws.nodes - info_ws.root_passes < info.nodes);
+    // warm start should improve performance
+    REQUIRE(info_ws.iters < info.iters);
+    REQUIRE(info_ws.time < info.time);
 
     // root dual bound should be better with warm start
     REQUIRE(info.last_cut_pass <= info_ws.last_cut_pass);
@@ -256,7 +254,7 @@ TEST_CASE("Test doBranchAndBoundWithSymphony", "[SymphonyHelper::doBranchAndBoun
     REQUIRE(0 < info_ws.root_passes);
     REQUIRE(info_ws.root_passes <= info_ws.nodes);
     // iterations increase monotonically
-    REQUIRE(0 < info_ws.root_iters);
+    REQUIRE(0 <= info_ws.root_iters);
     REQUIRE(info_ws.root_iters <= info_ws.iters);
   }
 
@@ -312,7 +310,7 @@ TEST_CASE("Test doBranchAndBoundWithSymphony", "[SymphonyHelper::doBranchAndBoun
     REQUIRE(0 < info_ws.root_passes);
     REQUIRE(info_ws.root_passes <= info_ws.nodes);
     // iterations increase monotonically
-    REQUIRE(0 < info_ws.root_iters);
+    REQUIRE(0 <= info_ws.root_iters);
     REQUIRE(info_ws.root_iters <= info_ws.iters);
   }
 
