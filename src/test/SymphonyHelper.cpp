@@ -157,6 +157,7 @@ void doBranchAndBoundWithSymphony(
     }
 
     input_model->applyCuts(cuts_std);
+    root_model->applyCuts(cuts_std);
   }
 
   // if provided a parametric model, modify it to match input_model
