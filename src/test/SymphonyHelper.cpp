@@ -44,7 +44,7 @@ void setStrategyForBBTestSymphony(const VPCParameters& params, const int strateg
   // ---- Always-set basics ----
   model->setSymParam("time_limit", params.get(doubleParam::BB_TIMELIMIT));
   model->setSymParam("gap_limit", .01);  // .01% gap limit
-  model->setSymParam("verbosity", 4);
+  model->setSymParam("verbosity", params.get(VERBOSITY));
   model->setSymParam("keep_warm_start", true); // always keep the warm start tree
 
   // ---- Strategy-controlled toggles ----
