@@ -218,6 +218,26 @@ void doBranchAndBoundWithSymphony(
     root_env->mip = create_copy_mip_desc(env->mip);
   }
 
+  // resolve each node in the tree to get the bound
+  root_model->setSymParam("node_limit", 1);
+  root_model->resolve();
+  info.last_cut_pass = root_env->tm->lb;
+
+  // process just the first node (without resolving the tree to get the correct time info) to start
+  parametric_model->setSymParam("node_limit", 1);
+  parametric_model->resolve();
+
+  // capture first node specific stats
+  info.root_time = env->comp_times.readtime + env->comp_times.ub_overhead +
+    env->comp_times.ub_heurtime + env->comp_times.lb_overhead +
+    env->comp_times.lb_heurtime + env->tm->comp_times.communication +
+    env->tm->comp_times.lp + env->tm->comp_times.lp_setup +
+    env->tm->comp_times.separation + env->tm->comp_times.fixing +
+    env->tm->comp_times.pricing + env->tm->comp_times.strong_branching +
+    env->tm->comp_times.cut_pool + env->tm->comp_times.primal_heur;
+  info.root_iters =  env->tm->lp_stat.lp_iter_num;
+  info.root_passes = env->tm->stat.analyzed;  // represents nodes processed so far
+
   // set primal warm start if requested
   if (provide_sol) {
 
@@ -262,35 +282,9 @@ void doBranchAndBoundWithSymphony(
     env->sp = pool;
   }
 
-  // resolve each node in the tree to get the bound
-  root_model->setSymParam("node_limit", 1);
-  root_model->resolve();
-  info.last_cut_pass = root_env->tm->lb;
-
-  // process just the first node (without resolving the tree to get the correct time info) to start
-  parametric_model->setSymParam("node_limit", 1);
-  parametric_model->resolve();
-
-  // capture first node specific stats
-  info.root_time = env->comp_times.readtime + env->comp_times.ub_overhead +
-    env->comp_times.ub_heurtime + env->comp_times.lb_overhead +
-    env->comp_times.lb_heurtime + env->tm->comp_times.communication +
-    env->tm->comp_times.lp + env->tm->comp_times.lp_setup +
-    env->tm->comp_times.separation + env->tm->comp_times.fixing +
-    env->tm->comp_times.pricing + env->tm->comp_times.strong_branching +
-    env->tm->comp_times.cut_pool + env->tm->comp_times.primal_heur;
-  info.root_iters =  env->tm->lp_stat.lp_iter_num;
-  info.root_passes = env->tm->stat.analyzed;  // represents nodes processed so far
-
-  // solve the branch-and-bound tree if not already optimal
+  // now solve the branch-and-bound tree to optimality
   parametric_model->setSymParam("node_limit", -1);
-  double ub = env->tm->ub != 0 ? env->tm->ub : obj_value;
-  if (ub == std::numeric_limits<double>::max() ||
-      std::abs(env->tm->lb - ub)/std::abs(ub) > 1e-4) {
-
-    // we're not already optimal so solve to optimality
-    parametric_model->resolve();
-  }
+  parametric_model->resolve();
 
   // bounds
   info.bound = env->tm->lb;
