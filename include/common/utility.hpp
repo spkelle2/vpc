@@ -163,8 +163,32 @@ int parseFilename(std::string& dir, std::string& instname, std::string& in_file_
 /// @brief Get objective value from file \p opt_filename where each line is "instance,value"
 double getObjValueFromFile(std::string opt_filename, std::string fullfilename, FILE* logfile);
 
+/**
+ * Legacy reader: reads lines "varname value" but (historically) returned values
+ * in FILE ORDER. That is not valid for Gurobi .sol files if you later dot with
+ * objective coefficients in MODEL ORDER.
+ *
+ * This overload is kept for compatibility, but you should prefer the overload
+ * that takes col_names.
+ */
 /// @brief Retrieve solution from a file \p filename.
 void getSolFromFile(const char* filename, std::vector<double>& sol);
+
+/**
+ * Correct reader for name keyed .sol files (Gurobi style: "VarName value").
+ * Builds a dense solution vector in MODEL COLUMN ORDER as given by col_names.
+ *
+ * @param filename    Solution file path
+ * @param col_names   Variable names in the linearized model column order (size N)
+ * @param sol         Output dense solution vector (size N)
+ * @param header_obj  Optional. If non-null, set to "# Objective value = ..." if present, else NaN
+ */
+/// @brief Retrieve solution from a file \p filename.
+void getSolFromFile(
+    const char* filename,
+    const std::vector<std::string>& col_names,
+    std::vector<double>& sol,
+    double* header_obj = nullptr);
 
 /// @brief Check if a file exists
 bool fexists(const char* filename);

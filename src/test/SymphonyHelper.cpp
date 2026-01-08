@@ -238,53 +238,81 @@ void doBranchAndBoundWithSymphony(
   info.root_iters =  env->tm->lp_stat.lp_iter_num;
   info.root_passes = env->tm->stat.analyzed;  // represents nodes processed so far
 
-  // set primal warm start if requested
-  if (provide_sol) {
+  // finish the solve only if not optimal already
+  bool optimal = env->warm_start && env->warm_start->has_ub &&
+      (std::abs(env->warm_start->ub - env->tm->ub) <= 1e-6 * (1.0 + std::abs(env->tm->ub)));
+  if (!optimal) {
 
-    // Check if user provides a solution file
-    std::string solfile = params.get(stringParam::SOLFILE);
-    verify((solfile.size() > 4) && (solfile.compare(solfile.size() - 4, 4, ".sol") == 0),
-           "VPC requires a .sol file to primal warm-start Symphony");
+    // set primal warm start if requested
+    if (provide_sol) {
+      // Check if user provides a solution file
+      std::string solfile = params.get(stringParam::SOLFILE);
+      verify((solfile.size() > 4) && (solfile.compare(solfile.size() - 4, 4, ".sol") == 0),
+             "VPC requires a .sol file to primal warm-start Symphony");
 
-    // read in the solution file
-    std::vector<double> vals;
-    getSolFromFile(solfile.c_str(), vals);
+      // Build SYMPHONY column names in SYMPHONY order (col 0..n-1).
+      // You must implement this based on how your parametric_model stores names.
+      // The key is: col_names[j] must correspond to column j in parametric_model.
+      std::vector<std::string> col_names;
+      col_names.reserve(parametric_model->getNumCols());
+      for (int j = 0; j < parametric_model->getNumCols(); ++j) {
+        col_names.emplace_back(parametric_model->getColName(j));  // <- use your actual accessor
+      }
 
-    // check that the solution is valid
-    verify(vals.size() == parametric_model->getNumCols(), "solution has wrong dimension");
-    verify(isFeasible(*parametric_model.get(), vals, false), "solution is not feasible");
+      // read in the solution file in *SYMPHONY column order*
+      std::vector<double> vals;
+      double header_obj = std::numeric_limits<double>::quiet_NaN();
+      getSolFromFile(solfile.c_str(), col_names, vals, &header_obj);
 
-    // copy it over to C-style arrays for Symphony
-    for (int i = 0; i < vals.size(); i++) {
-      xind[i] = i;
-      xval[i] = vals[i];
+      // check that the solution is valid
+      verify(vals.size() == (size_t)parametric_model->getNumCols(), "solution has wrong dimension");
+      verify(isFeasible(*parametric_model.get(), vals, false), "solution is not feasible");
+
+      // copy it over to C-style arrays for Symphony (same order: column i -> vals[i])
+      for (int i = 0; i < (int)vals.size(); ++i) {
+        xind[i] = i;
+        xval[i] = vals[i];
+      }
+
+      // get the objective value of the solution (consistent with vals now)
+      obj_value = 0.0;
+      const double* c = parametric_model->getObjCoefficients();
+      for (int j = 0; j < parametric_model->getNumCols(); ++j) {
+        obj_value += c[j] * vals[j];
+      }
+
+      // if header objective provided, verify it matches computed objective
+      if (std::isfinite(header_obj)) {
+        const double diff = std::fabs(obj_value - header_obj);
+        const double tol  = 1e-6 * (1.0 + std::fabs(header_obj));
+        verify(diff <= tol, "Objective mismatch between header and computed. "
+                            "This usually indicates a name mismatch between "
+                            "SYMPHONY model and .sol file.");
+      }
+
+      // put the solution into a Symphony solution structure
+      sol->objval = obj_value;
+      sol->xlength = parametric_model->getNumCols();
+      sol->xind = xind;
+      sol->xval = xval;
+      sol->node_index = 0;
+      sol->node_level = 0;
+
+      // create a solution pool from solution
+      pool->max_solutions = 1;
+      pool->num_solutions = 1;
+      pool->total_num_sols_found = 1;
+      solutions[0] = sol;
+      pool->solutions = solutions;
+
+      // add the solution pool to the symphony environment
+      env->sp = pool;
     }
 
-    // get the objective value of the solution
-    obj_value = std::inner_product(vals.begin(), vals.end(), parametric_model->getObjCoefficients(), 0.0);
-
-    // put the solution into a Symphony solution structure
-    sol->objval = obj_value;
-    sol->xlength = parametric_model->getNumCols();
-    sol->xind = xind;
-    sol->xval = xval;
-    sol->node_index = 0;
-    sol->node_level = 0;
-
-    // create a solution pool from solution
-    pool->max_solutions = 1;  // only keep best solution in the pool - we don't really care
-    pool->num_solutions = 1;
-    pool->total_num_sols_found = 1;
-    solutions[0] = sol;
-    pool->solutions = solutions;
-
-    // add the solution pool to the symphony environment
-    env->sp = pool;
+    // now solve the branch-and-bound tree to optimality
+    parametric_model->setSymParam("node_limit", -1);
+    parametric_model->resolve();
   }
-
-  // now solve the branch-and-bound tree to optimality
-  parametric_model->setSymParam("node_limit", -1);
-  parametric_model->resolve();
 
   // bounds
   info.bound = env->tm->lb;

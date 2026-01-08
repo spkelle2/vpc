@@ -139,59 +139,137 @@ double getObjValueFromFile(std::string opt_filename, std::string fullfilename, F
   return std::numeric_limits<double>::lowest();
 } /* getObjValueFromFile */
 
-void getSolFromFile(
-    ///> [in] File with lines "varname value" (space-separated) and comments starting with # or *.
-    const char* filename,
-    ///> [out] Solution is stored here; space is allocated based on how many variables are listed in \p filename. Needs to be N to match the variables in the linearized model.
-    std::vector<double>& sol) {
-  if (!filename) {
-    return;
-  }
+struct ParsedSol {
+  std::unordered_map<std::string, double> x_by_name;
+  double header_objective = std::numeric_limits<double>::quiet_NaN();
+};
+
+static inline std::string ltrim(std::string s) {
+  const auto p = s.find_first_not_of(" \t\r\n");
+  if (p == std::string::npos) return "";
+  return s.substr(p);
+}
+
+ParsedSol readNameValueSolFile(const char* filename) {
+  ParsedSol parsed;
+  if (!filename) return parsed;
 
   std::ifstream infile(filename);
-  if (infile.is_open()) {
-    // Reset sol
-    sol.clear();
-
-    std::string line;
-    while (std::getline(infile, line)) {
-      std::istringstream iss(line);
-      if (line.empty() || line[0] == '#' || line[0] == '*') {
-        continue;
-      }
-      std::string var_name;
-      if (!(std::getline(iss, var_name, ' '))) {
-        warning_msg(warnstring,
-            "Could not read variable name. String is %s.\n",
-            line.c_str());
-        continue;
-      }
-      try {
-        std::string token;
-        if (!(std::getline(iss, token, ' '))) {
-          continue; // unable to find value on this line
-        }
-        if (token.empty() || token == " ") {
-          sol.push_back(0);
-        }
-        const double val = std::stod(token);
-        sol.push_back(val);
-      } catch (std::exception& e) {
-        warning_msg(warnstring,
-            "Could not read value. String is %s.\n",
-            line.c_str());
-        continue;
-      }
-    }
-    infile.close();
-  } else {
-    // If we were not able to open the file, throw an error
+  if (!infile.is_open()) {
     error_msg(errorstring, "Not able to open solution file %s.\n", filename);
     verify(false, "VPC tried to exit with error code 1");
   }
 
-  return;
-} /* getSolFromFile */
+  std::string line;
+  while (std::getline(infile, line)) {
+    line = ltrim(line);
+    if (line.empty()) continue;
+
+    // Comments and header
+    if (line[0] == '#' || line[0] == '*') {
+      // Parse "# Objective value = 1.123e+05"
+      const auto pos = line.find("Objective value");
+      if (pos != std::string::npos) {
+        const auto eq = line.find('=');
+        if (eq != std::string::npos) {
+          std::string num = ltrim(line.substr(eq + 1));
+          try {
+            parsed.header_objective = std::stod(num);
+          } catch (...) {
+            // ignore parse errors
+          }
+        }
+      }
+      continue;
+    }
+
+    // Data line: "VarName value" (space or tab separated)
+    std::istringstream iss(line);
+    std::string name;
+    double val = 0.0;
+
+    if (!(iss >> name)) {
+      warning_msg(warnstring,
+                  "Could not read variable name. String is %s.\n",
+                  line.c_str());
+      continue;
+    }
+    if (!(iss >> val)) {
+      warning_msg(warnstring,
+                  "Could not read value for %s. String is %s.\n",
+                  name.c_str(), line.c_str());
+      continue;
+    }
+
+    parsed.x_by_name[name] = val; // last occurrence wins
+  }
+
+  return parsed;
+}
+
+void getSolFromFile(const char* filename, std::vector<double>& sol) {
+  if (!filename) return;
+
+  // Keep the old behavior for compatibility: file order push_back.
+  // But warn loudly because this is the root cause of your mismatch.
+  warning_msg(warnstring,
+              "getSolFromFile(filename, sol) is positional and unsafe for Gurobi .sol files. "
+              "Use getSolFromFile(filename, col_names, sol, ...) to build sol in model order.\n");
+
+  std::ifstream infile(filename);
+  if (!infile.is_open()) {
+    error_msg(errorstring, "Not able to open solution file %s.\n", filename);
+    verify(false, "VPC tried to exit with error code 1");
+  }
+
+  sol.clear();
+
+  std::string line;
+  while (std::getline(infile, line)) {
+    if (line.empty() || line[0] == '#' || line[0] == '*') continue;
+
+    std::istringstream iss(line);
+    std::string var_name;
+    double val = 0.0;
+
+    if (!(iss >> var_name)) {
+      warning_msg(warnstring,
+                  "Could not read variable name. String is %s.\n",
+                  line.c_str());
+      continue;
+    }
+    if (!(iss >> val)) {
+      warning_msg(warnstring,
+                  "Could not read value. String is %s.\n",
+                  line.c_str());
+      continue;
+    }
+
+    sol.push_back(val);
+  }
+}
+
+void getSolFromFile(
+    const char* filename,
+    const std::vector<std::string>& col_names,
+    std::vector<double>& sol,
+    double* header_obj) {
+
+  if (!filename) return;
+
+  ParsedSol parsed = readNameValueSolFile(filename);
+
+  if (header_obj) {
+    *header_obj = parsed.header_objective;
+  }
+
+  // Build dense vector in model column order
+  sol.assign(col_names.size(), 0.0);
+  for (size_t i = 0; i < col_names.size(); ++i) {
+    auto it = parsed.x_by_name.find(col_names[i]);
+    if (it != parsed.x_by_name.end()) sol[i] = it->second;
+  }
+}
 
 /**
  * @brief Check if file exists
