@@ -143,9 +143,16 @@ void getSolFromFile(
     ///> [in] File with lines "varname value" (space-separated) and comments starting with # or *.
     const char* filename,
     ///> [out] Solution is stored here; space is allocated based on how many variables are listed in \p filename. Needs to be N to match the variables in the linearized model.
-    std::vector<double>& sol) {
+    std::vector<double>& sol,
+    ///> [out] Objective optionally returned here if not nullptr and objective in file.
+    double* obj_val
+) {
   if (!filename) {
     return;
+  }
+
+  if (obj_val) {
+    *obj_val = std::numeric_limits<double>::quiet_NaN();
   }
 
   std::ifstream infile(filename);
@@ -155,17 +162,39 @@ void getSolFromFile(
 
     std::string line;
     while (std::getline(infile, line)) {
-      std::istringstream iss(line);
-      if (line.empty() || line[0] == '#' || line[0] == '*') {
+
+      if (line.empty()) {
         continue;
       }
+
+      // Capture objective value if present
+      if (obj_val && line[0] == '#') {
+        const std::string prefix = "# Objective value =";
+        if (line.compare(0, prefix.size(), prefix) == 0) {
+          try {
+            *obj_val = std::stod(line.substr(prefix.size()));
+          } catch (std::exception& e) {
+            warning_msg(warnstring,
+                        "Could not read objective value. String is %s.\n",
+                        line.c_str());
+          }
+          continue;
+        }
+      }
+
+      std::istringstream iss(line);
+      if (line[0] == '#' || line[0] == '*') {
+        continue;
+      }
+
       std::string var_name;
       if (!(std::getline(iss, var_name, ' '))) {
         warning_msg(warnstring,
-            "Could not read variable name. String is %s.\n",
-            line.c_str());
+                    "Could not read variable name. String is %s.\n",
+                    line.c_str());
         continue;
       }
+
       try {
         std::string token;
         if (!(std::getline(iss, token, ' '))) {
@@ -173,13 +202,14 @@ void getSolFromFile(
         }
         if (token.empty() || token == " ") {
           sol.push_back(0);
+          continue;
         }
         const double val = std::stod(token);
         sol.push_back(val);
       } catch (std::exception& e) {
         warning_msg(warnstring,
-            "Could not read value. String is %s.\n",
-            line.c_str());
+                    "Could not read value. String is %s.\n",
+                    line.c_str());
         continue;
       }
     }

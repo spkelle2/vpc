@@ -211,6 +211,14 @@ TEST_CASE("Test doBranchAndBoundWithSymphony", "[SymphonyHelper::doBranchAndBoun
 
   SECTION( "Test warm-start lower bound for objective changes" ) {
 
+    // update parameters to ditch provided bound since we perturb the objective significantly
+    vpc_params.set(BB_STRATEGY, get_bb_option_value({
+        BB_Strategy_Options::user_cuts, // to allow VPCs and data collection
+        BB_Strategy_Options::presolve_off, // instances will be presolved already
+        BB_Strategy_Options::heuristics_off,  // already providing bound
+        BB_Strategy_Options::all_cuts_off // don't use any cuts other than VPCs
+    }));
+
     // solver
     OsiClpSolverInterface si;
     SolverInterface* solver;

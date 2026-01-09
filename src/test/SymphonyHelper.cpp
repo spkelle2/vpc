@@ -10,6 +10,7 @@
 #include "sym_tm.h"
 #include "sym_master.h"
 #include <numeric> // for std::iota, std::inner_product, std::abs
+#include <cmath> // for std::isfinite
 
 #endif
 
@@ -247,8 +248,9 @@ void doBranchAndBoundWithSymphony(
            "VPC requires a .sol file to primal warm-start Symphony");
 
     // read in the solution file
+    std::shared_ptr<double> cached_obj = std::make_shared<double>(std::numeric_limits<double>::quiet_NaN());
     std::vector<double> vals;
-    getSolFromFile(solfile.c_str(), vals);
+    getSolFromFile(solfile.c_str(), vals, cached_obj.get());
 
     // check that the solution is valid
     verify(vals.size() == parametric_model->getNumCols(), "solution has wrong dimension");
@@ -262,6 +264,12 @@ void doBranchAndBoundWithSymphony(
 
     // get the objective value of the solution
     obj_value = std::inner_product(vals.begin(), vals.end(), parametric_model->getObjCoefficients(), 0.0);
+    if (cached_obj && std::isfinite(*cached_obj)) {
+      // sometimes when symphony warm-starts it doesn't seem to compute the objective value
+      // correctly, so just use the cached value if available
+      verify(std::abs(obj_value - *cached_obj) / std::abs(*cached_obj) <= 1e-5,
+             "provided solution objective value does not match computed objective value");
+    }
 
     // put the solution into a Symphony solution structure
     sol->objval = obj_value;

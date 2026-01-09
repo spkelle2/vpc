@@ -163,8 +163,8 @@ int parseFilename(std::string& dir, std::string& instname, std::string& in_file_
 /// @brief Get objective value from file \p opt_filename where each line is "instance,value"
 double getObjValueFromFile(std::string opt_filename, std::string fullfilename, FILE* logfile);
 
-/// @brief Retrieve solution from a file \p filename.
-void getSolFromFile(const char* filename, std::vector<double>& sol);
+/// @brief Retrieve solution (and optionally objective value if available) from a file \p filename.
+void getSolFromFile(const char* filename, std::vector<double>& sol, double* obj_val = nullptr);
 
 /// @brief Check if a file exists
 bool fexists(const char* filename);
