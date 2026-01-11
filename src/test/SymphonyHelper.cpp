@@ -61,6 +61,10 @@ void setStrategyForBBTestSymphony(const VPCParameters& params, const int strateg
     if (use_bb_option(strategy, BB_Strategy_Options::heuristics_off)) {
       model->setSymParam("do_primal_heuristic", false);
     }
+
+    if (use_bb_option(strategy, BB_Strategy_Options::reduced_cost_fixing_off)) {
+      model->setSymParam("do_reduced_cost_fixing", false);
+    }
   }
 
   // Enable full strong Strong branching
@@ -83,10 +87,11 @@ void setStrategyForBBTestSymphony(const VPCParameters& params, const int strateg
     } else if (change_type == OBJ_COEFF_CHANGED) {
       // have to turn off reduced cost fixing to reuse disjunctions under objective changes
       model->setSymParam("do_reduced_cost_fixing", false);
+      // check to make sure we don't have a conflicting strategy
+      verify(strategy <= 0 || use_bb_option(strategy, BB_Strategy_Options::reduced_cost_fixing_off),
+             "Symphony requires reduced cost fixing turned off for disjunctive warm-starts under OBJ changes");
     }
   }
-  model->setSymParam("generate_cgl_cuts", false);
-  model->setSymParam("do_reduced_cost_fixing", false);
 }
 
 // no getting around providing OsiSymSolverInterface, passing just a warm start does not work

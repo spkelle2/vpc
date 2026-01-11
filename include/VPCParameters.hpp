@@ -45,6 +45,7 @@ namespace VPCParametersNamespace {
 #define ENUM_OPTION_13 8192
 #define ENUM_OPTION_14 16384
 #define ENUM_OPTION_15 32768
+#define ENUM_OPTION_16 65536
 
 /********** PARAMETERS **********/
 /// Integer-valued parameters
@@ -93,7 +94,9 @@ enum intParam {
   /// \li  heuristics_on = 4096,
   /// \li  use_best_bound = 8192,
   /// \li  strong_branching_on = 16384
-  BB_STRATEGY, 
+  /// \li  reduced_cost_fixing_off = 32768
+  /// \li  reduced_cost_fixing_on = 65536
+  BB_STRATEGY,
   BB_MODE, ///< 111: each bit represents whether to branch with gmics, vpcs, and no cuts (from largest to smallest bit)
   RECYCLED_DISJUNCTION, ///< 1 if we provided a disjunction to CglVPC and 0 if we created one
   NUM_INT_PARAMS ///< number of integer params
@@ -195,21 +198,23 @@ inline int disable_temp_option(const int strategy, const TempOptions option) {
 
 /// @brief Options for the parameter BB_STRATEGY
 enum class BB_Strategy_Options {
-  off                 = 0,              ///< do not do any b&b tests
-  cbc                 = ENUM_OPTION_1,  ///< use Cbc as the branch-and-bound solver
-  cplex               = ENUM_OPTION_2,  ///< use CPLEX as the branch-and-bound solver
-  gurobi              = ENUM_OPTION_3,  ///< use Gurobi as the branch-and-bound solver
-  user_cuts           = ENUM_OPTION_4,  ///< tell solver that user cuts may be used
-  all_cuts_off        = ENUM_OPTION_5,  ///< in b&b, do not use any cuts
-  all_cuts_on         = ENUM_OPTION_6,  ///< in b&b, use all possible (default) cuts
-  gmics_off           = ENUM_OPTION_7,  ///< in b&b, turn off gomory cuts
-  gmics_on            = ENUM_OPTION_8,  ///< in b&b, turn on gomory cuts
-  presolve_off        = ENUM_OPTION_9,  ///< in b&b, turn off presolve
-  presolve_on         = ENUM_OPTION_10, ///< in b&b, turn on presolve
-  heuristics_off      = ENUM_OPTION_11, ///< in b&b, turn off heuristics for finding primal-feasible solutions
-  heuristics_on       = ENUM_OPTION_12, ///< in b&b, turn on heuristics for finding primal-feasible solutions
-  use_best_bound      = ENUM_OPTION_13, ///< tell b&b solver to use best known obj value bound to prune subtrees
-  strong_branching_on = ENUM_OPTION_14, ///< tell b&b solver to use strong branching
+  off                     = 0,              ///< do not do any b&b tests
+  cbc                     = ENUM_OPTION_1,  ///< use Cbc as the branch-and-bound solver
+  cplex                   = ENUM_OPTION_2,  ///< use CPLEX as the branch-and-bound solver
+  gurobi                  = ENUM_OPTION_3,  ///< use Gurobi as the branch-and-bound solver
+  user_cuts               = ENUM_OPTION_4,  ///< tell solver that user cuts may be used
+  all_cuts_off            = ENUM_OPTION_5,  ///< in b&b, do not use any cuts
+  all_cuts_on             = ENUM_OPTION_6,  ///< in b&b, use all possible (default) cuts
+  gmics_off               = ENUM_OPTION_7,  ///< in b&b, turn off gomory cuts
+  gmics_on                = ENUM_OPTION_8,  ///< in b&b, turn on gomory cuts
+  presolve_off            = ENUM_OPTION_9,  ///< in b&b, turn off presolve
+  presolve_on             = ENUM_OPTION_10, ///< in b&b, turn on presolve
+  heuristics_off          = ENUM_OPTION_11, ///< in b&b, turn off heuristics for finding primal-feasible solutions
+  heuristics_on           = ENUM_OPTION_12, ///< in b&b, turn on heuristics for finding primal-feasible solutions
+  use_best_bound          = ENUM_OPTION_13, ///< tell b&b solver to use best known obj value bound to prune subtrees
+  strong_branching_on     = ENUM_OPTION_14, ///< tell b&b solver to use strong branching
+  reduced_cost_fixing_off = ENUM_OPTION_15, ///< tell b&b solver to not use reduced cost fixing
+  reduced_cost_fixing_on  = ENUM_OPTION_16, ///< tell b&b solver to use reduced cost fixing
 }; /* BB_Strategy_Options */
 
 /// @brief Shortcut for checking if a bit is enabled
@@ -775,9 +780,9 @@ inline void readParams(VPCParameters& params, std::string infilename) {
 /// @brief Print parameters and constants
 inline void printParams(
     /// parameters to print
-    const VPCParameters& params, 
+    const VPCParameters& params,
     /// where to print
-    FILE* logfile = stdout, 
+    FILE* logfile = stdout,
     /// \li 0 = numeric param name/values except string params (newline-separated)
     /// \li 1 = only numeric param names (comma-separated)
     /// \li 2 = only numeric param values (comma-separated)

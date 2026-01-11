@@ -46,7 +46,6 @@ TEST_CASE("Test doBranchAndBoundWithSymphony", "[SymphonyHelper::doBranchAndBoun
       BB_Strategy_Options::presolve_off, // instances will be presolved already
       BB_Strategy_Options::heuristics_off,  // already providing bound
       BB_Strategy_Options::use_best_bound,  // use provided solution
-      BB_Strategy_Options::all_cuts_off // don't use any cuts other than VPCs
   }));
 
   SECTION( "Test first instance solve" ) {
@@ -92,6 +91,11 @@ TEST_CASE("Test doBranchAndBoundWithSymphony", "[SymphonyHelper::doBranchAndBoun
   }
 
   SECTION( "Test objective perturbed warm-start" ) {
+
+    // symphony needs reduced cost fixing off to reuse disjunctions under objective changes
+    vpc_params.set(BB_STRATEGY, get_bb_option_value({
+        BB_Strategy_Options::reduced_cost_fixing_off,
+    }));
 
     // small changes should result in warm-start being effective
 
@@ -153,6 +157,10 @@ TEST_CASE("Test doBranchAndBoundWithSymphony", "[SymphonyHelper::doBranchAndBoun
   SECTION( "Test rhs-perturbed warm-start" ){
 
     // small changes should result in warm-start being effective
+    // symphony needs cuts off to reuse disjunctions under RHS changes
+    vpc_params.set(BB_STRATEGY, get_bb_option_value({
+        BB_Strategy_Options::all_cuts_off,
+    }));
 
     // solver
     OsiClpSolverInterface si;
@@ -216,7 +224,7 @@ TEST_CASE("Test doBranchAndBoundWithSymphony", "[SymphonyHelper::doBranchAndBoun
         BB_Strategy_Options::user_cuts, // to allow VPCs and data collection
         BB_Strategy_Options::presolve_off, // instances will be presolved already
         BB_Strategy_Options::heuristics_off,  // already providing bound
-        BB_Strategy_Options::all_cuts_off // don't use any cuts other than VPCs
+        BB_Strategy_Options::reduced_cost_fixing_off, // to allow warm start under objective changes
     }));
 
     // solver
@@ -269,6 +277,11 @@ TEST_CASE("Test doBranchAndBoundWithSymphony", "[SymphonyHelper::doBranchAndBoun
   SECTION( "Test warm-start lower bound for RHS changes" ) {
 
     vpc_params.set(VPCParametersNamespace::SOLFILE, "../test/bm23_rhs.sol");
+
+    // symphony needs cuts off to reuse disjunctions under RHS changes
+    vpc_params.set(BB_STRATEGY, get_bb_option_value({
+        BB_Strategy_Options::all_cuts_off,
+    }));
 
     // solver
     OsiClpSolverInterface si;
