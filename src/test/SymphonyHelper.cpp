@@ -214,6 +214,11 @@ void doBranchAndBoundWithSymphony(
 
   // copy over warm start from the parametric model to the root model
   if (env->warm_start){
+    // remove any existing solution pool to make it fair vs cut generation only
+    FREE(env->sp);
+    env->warm_start->best_sol = lp_sol();
+
+    // copy over the warm start structure
     root_env->warm_start = create_copy_warm_start(env->warm_start);
     root_env->warm_start->force_resolve_tree = true;  // resolve the tree to get the correct bound
     root_env->mip = create_copy_mip_desc(env->mip);
