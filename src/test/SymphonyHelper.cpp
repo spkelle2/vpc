@@ -296,7 +296,7 @@ void doBranchAndBoundWithSymphony(
   }
 
   // now solve the branch-and-bound tree to optimality
-  parametric_model->setSymParam("node_limit", -1);
+  parametric_model->setSymParam("node_limit", params.get(BB_NODE_LIMIT));
   parametric_model->resolve();
 
   // bounds

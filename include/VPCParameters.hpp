@@ -96,6 +96,7 @@ enum intParam {
   BB_STRATEGY, 
   BB_MODE, ///< 111: each bit represents whether to branch with gmics, vpcs, and no cuts (from largest to smallest bit)
   RECYCLED_DISJUNCTION, ///< 1 if we provided a disjunction to CglVPC and 0 if we created one
+  BB_NODE_LIMIT, ///< node limit for branch-and-bound
   NUM_INT_PARAMS ///< number of integer params
 }; /* intParam */
 /// Double-valued parameters
@@ -555,6 +556,10 @@ struct VPCParameters {
     {intParam::RECYCLED_DISJUNCTION,
         IntParameter(intParam::RECYCLED_DISJUNCTION, "RECYCLED_DISJUNCTION",
             0, 0, 1)},
+    {intParam::BB_NODE_LIMIT,
+     IntParameter(intParam::BB_NODE_LIMIT, "BB_NODE_LIMIT",
+                  -1, -1, std::numeric_limits<int>::max())},
+
   }; /* intParamValues */
 
   /// @brief double parameter values

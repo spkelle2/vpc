@@ -103,10 +103,12 @@ TEST_CASE("Test doBranchAndBoundWithSymphony", "[SymphonyHelper::doBranchAndBoun
     solver = const_cast<SolverInterface*>(dynamic_cast<const SolverInterface*>(&si));
 
     // solve initial instance with symphony to get warm start
+    vpc_params.set(VPCParametersNamespace::BB_NODE_LIMIT, 64);  // partial BB tree
     BBInfo info_initial;
     std::shared_ptr<OsiSymSolverInterface> parametric_model = std::shared_ptr<OsiSymSolverInterface>();
     doBranchAndBoundWithSymphony(vpc_params, vpc_params.get(BB_STRATEGY), solver,
                                  info_initial, nullptr, parametric_model);
+    vpc_params.set(VPCParametersNamespace::BB_NODE_LIMIT, -1);  // partial BB tree
 
     // create a solver with a perturbed objective to force a different, but previously found solution
     OsiSolverInterface * si_ptb = si.clone();
@@ -137,7 +139,7 @@ TEST_CASE("Test doBranchAndBoundWithSymphony", "[SymphonyHelper::doBranchAndBoun
     REQUIRE(0 <= info_ws.root_iters);
     REQUIRE(info_ws.root_iters <= info_ws.iters);
 
-    // warm start should improve performance
+    // this small of warm start should improve iterations but not time
     REQUIRE(info_ws.iters < info.iters);
     REQUIRE(info_ws.time < info.time);
 
@@ -148,6 +150,11 @@ TEST_CASE("Test doBranchAndBoundWithSymphony", "[SymphonyHelper::doBranchAndBoun
     REQUIRE(info_ws.bound == info_ws.obj);
     REQUIRE(info_ws.bound == info.bound);
     REQUIRE(info_ws.obj == info.obj);
+
+    // a 64 node warm start should have roughly that many nodes at the root
+    REQUIRE((info_ws.root_passes > 60 && info_ws.root_passes <= 64));
+    // bound should be intermediate between initial and final
+    REQUIRE((27 < info_ws.last_cut_pass && info_ws.last_cut_pass < 28));
   }
 
   SECTION( "Test rhs-perturbed warm-start" ){
