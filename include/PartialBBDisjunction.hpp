@@ -10,6 +10,8 @@
 
 #include "VPCDisjunction.hpp"
 
+struct BC_NODE;
+typedef struct BC_NODE bc_node;
 class OsiSolverInterface;
 class PartialBBDisjunction;
 
@@ -37,7 +39,8 @@ void generatePartialBBTree(PartialBBDisjunction* const owner,
 
 void generatePartialBBTreeSymphony(
     PartialBBDisjunction* const owner,
-    const OsiSolverInterface* const solver);
+    const OsiSolverInterface* const solver,
+    bc_node * root = nullptr);
 
 /// @brief Keeps split information at root, and best bound on each side
 struct RootTerm {

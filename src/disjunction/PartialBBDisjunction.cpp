@@ -566,23 +566,26 @@ void generatePartialBBTree(PartialBBDisjunction* const owner, CbcModel* cbc_mode
 
 void generatePartialBBTreeSymphony(
     PartialBBDisjunction* const owner,
-    const OsiSolverInterface* const solver) {
+    const OsiSolverInterface* const solver,
+    bc_node* root) {
 
-  BBInfo info;
-  std::shared_ptr <OsiSymSolverInterface> parametric_model = std::shared_ptr<OsiSymSolverInterface>();
-  int node_limit = owner->params.get(intParam::BB_NODE_LIMIT);
+  if (!root) {
+    BBInfo info;
+    std::shared_ptr <OsiSymSolverInterface> parametric_model = std::shared_ptr<OsiSymSolverInterface>();
+    int node_limit = owner->params.get(intParam::BB_NODE_LIMIT);
 
-  // generate a partial BB tree with DISJ_TERMS leaf nodes
-  owner->params.set(intParam::BB_NODE_LIMIT, owner->params.get(intParam::DISJ_TERMS));
-  doBranchAndBoundWithSymphony(
-      owner->params, owner->params.get(VPCParametersNamespace::BB_STRATEGY),
-      solver, info, nullptr, parametric_model);
-  owner->params.set(intParam::BB_NODE_LIMIT, node_limit);
+    // generate a partial BB tree with DISJ_TERMS leaf nodes
+    owner->params.set(intParam::BB_NODE_LIMIT, owner->params.get(intParam::DISJ_TERMS));
+    doBranchAndBoundWithSymphony(
+        owner->params, owner->params.get(VPCParametersNamespace::BB_STRATEGY),
+        solver, info, nullptr, parametric_model);
+    owner->params.set(intParam::BB_NODE_LIMIT, node_limit);
 
-  // get its root node
-  sym_environment * env = parametric_model->getSymphonyEnvironment();
-  warm_start_desc* ws = sym_get_warm_start(env, true);
-  bc_node* root = ws->rootnode;
+    // get its root node
+    sym_environment * env = parametric_model->getSymphonyEnvironment();
+    warm_start_desc* ws = sym_get_warm_start(env, true);
+    root = ws->rootnode;
+  }
 
   // set up the disjunction object
   owner->root_obj = root->lower_bound;
