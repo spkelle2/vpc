@@ -35,6 +35,10 @@ void generatePartialBBTree(PartialBBDisjunction* const owner,
     const int max_leaf_nodes, const int num_strong, const int num_before_trusted);
 #endif // USE_CBC
 
+void generatePartialBBTreeSymphony(
+    PartialBBDisjunction* const owner,
+    const OsiSolverInterface* const solver);
+
 /// @brief Keeps split information at root, and best bound on each side
 struct RootTerm {
   int var;       ///< var branched on
@@ -122,6 +126,9 @@ public:
   /// @brief Create a new disjunction that parameterizes the curren with the given solver.
   PartialBBDisjunction parameterize(const OsiSolverInterface* const solver,
                                     std::vector<std::unique_ptr<OsiSolverInterface>>* term_solvers = nullptr) const;
+
+  /// @brief raise an assert if the disjunction does not represent the leaves of a full binary tree.
+  void isFullBinaryTree();
 
 protected:
   /// @brief Initialize values of class members

@@ -119,6 +119,7 @@ enum stringParam {
   OPTFILE,
   SOLFILE,
   TMPFOLDER,
+  DISJUNCTION_SOLVER,
   NUM_STRING_PARAMS
 }; /* stringParam */
 
@@ -603,6 +604,8 @@ struct VPCParameters {
         StringParameter(stringParam::LOGFILE, "LOGFILE", "")},
     {stringParam::FILENAME,
         StringParameter(stringParam::FILENAME, "FILENAME", "")},
+    {stringParam::DISJUNCTION_SOLVER,
+        StringParameter(stringParam::DISJUNCTION_SOLVER, "FILENAME", "CBC")},
   }; /* stringParamValues */
 
   /// @brief Integer constants

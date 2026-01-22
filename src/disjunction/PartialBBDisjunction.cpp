@@ -5,6 +5,9 @@
  */
 #include "PartialBBDisjunction.hpp"
 
+// std lib
+#include <deque>
+
 // COIN-OR
 #ifdef USE_CBC
 #include <CbcModel.hpp>
@@ -35,6 +38,12 @@
 #include "SolverHelper.hpp"
 #include "utility.hpp"
 #include "VPCEventHandler.hpp" // currently requires Cbc
+#include "BBHelper.hpp"
+#include "SymphonyHelper.hpp"
+
+// Symphony
+#include "symphony.h"
+#include "sym_types.h"
 
 #ifdef TRACE
 #include "vpc_debug.hpp"
@@ -104,6 +113,12 @@ DisjExitReason PartialBBDisjunction::prepareDisjunction(const OsiSolverInterface
 //  }
   if (this->params.get(intParam::DISJ_TERMS) < 2) {
     return DisjExitReason::NO_DISJUNCTION_EXIT;
+  }
+
+  if (this->params.get(DISJUNCTION_SOLVER) == "SYMPHONY") {
+    generatePartialBBTreeSymphony(this, si);
+    // we raise failures if when we encounter them above
+    return DisjExitReason::SUCCESS_EXIT;
   }
 
   // Set up solver
@@ -548,3 +563,203 @@ void generatePartialBBTree(PartialBBDisjunction* const owner, CbcModel* cbc_mode
   }
 } /* generatePartialBBTree */
 #endif // USE_CBC
+
+void generatePartialBBTreeSymphony(
+    PartialBBDisjunction* const owner,
+    const OsiSolverInterface* const solver) {
+
+  BBInfo info;
+  std::shared_ptr <OsiSymSolverInterface> parametric_model = std::shared_ptr<OsiSymSolverInterface>();
+  int node_limit = owner->params.get(intParam::BB_NODE_LIMIT);
+
+  // generate a partial BB tree with DISJ_TERMS leaf nodes
+  owner->params.set(intParam::BB_NODE_LIMIT, owner->params.get(intParam::DISJ_TERMS));
+  doBranchAndBoundWithSymphony(
+      owner->params, owner->params.get(VPCParametersNamespace::BB_STRATEGY),
+      solver, info, nullptr, parametric_model);
+  owner->params.set(intParam::BB_NODE_LIMIT, node_limit);
+
+  // get its root node
+  sym_environment * env = parametric_model->getSymphonyEnvironment();
+  warm_start_desc* ws = sym_get_warm_start(env, true);
+  bc_node* root = ws->rootnode;
+
+  // set up the disjunction object
+  owner->root_obj = root->lower_bound;
+
+  // bfs on nodes. track branching decisions to reach each node ordered from root to leaf
+  std::deque<bc_node*> nodes{root};
+  std::deque<std::vector<int>> branch_paths{{}};
+  while (!nodes.empty()){
+
+    // get current node
+    bc_node* current = nodes.front();  // current node
+    nodes.pop_front();
+    // and path to it (represented by the child index each node in the path was for its parent)
+    std::vector<int> branch_path = branch_paths.front();
+    branch_paths.pop_front();
+
+    if (current->bobj.child_num > 0) {
+      // internal node - add children and their indices to bfs queues
+      // indices used later to traverse from root to leaf
+      for (int i = 0; i < current->bobj.child_num; i++){
+        nodes.push_back(current->children[i]);
+        branch_paths.push_back(branch_path);
+        branch_paths.back().push_back(i);
+      }
+    } else {
+      // leaf node - create disjunctive term
+      DisjunctiveTerm term;
+      term.type = "leaf";
+
+      // traverse path from root to current node to get branching decisions
+      verify(branch_path.size() == current->bc_level,
+             "branch path size should equal node depth");
+      bc_node* path_node = root;
+      for (int level = 0; level < branch_path.size(); level++){
+        int child_idx = branch_path[level];
+
+        // L is <=, thus upper bound -> term.changed_bound is 1
+        // G is >=, thus lower bound -> term.changed_bound is 0
+        // source: Disjunction.hpp::DisjunctiveTerm
+        char sense = path_node->bobj.sense[child_idx];
+        verify(sense == 'L' || sense == 'G', "VPC only supports <= and >= branching");
+        term.changed_var.push_back(path_node->bobj.position);
+        term.changed_bound.push_back(sense == 'L' ? 1 : 0);
+        term.changed_value.push_back(path_node->bobj.rhs[child_idx]);
+
+        if (level < branch_path.size() - 1) {
+          // move to next node in path
+          path_node = path_node->children[child_idx];
+        } else {
+          verify(path_node->children[child_idx] == current,
+                 "current node should be end of path");
+        }
+      }
+
+      // add term to disjunction
+      owner->terms.push_back(term);
+      owner->num_terms++;
+    }
+  }
+
+  // call parameterize with existing solver to set feasibility, objective values, and warm starts
+  std::vector<std::unique_ptr<OsiSolverInterface>> term_solvers;
+  *owner = owner->parameterize(solver, &term_solvers);
+  for (int i = 0; i < owner->num_terms; i++) {
+    // save the basis for each term - currently in added row format b/c pdc expects this format
+    // not bothering with tightened bound format since we don't have it handy here and VPC can figure it out
+    owner->terms[i].basis_extended = dynamic_cast<CoinWarmStartBasis*>(term_solvers[i]->getWarmStart());
+  }
+
+  // verify that the disjunction represents the leaves of a full binary tree
+  owner->isFullBinaryTree();
+
+} /* generatePartialBBTree */
+
+/**
+ * @details raise an assert if the disjunction does not represent the leaves of a full binary tree.
+ * This function assumes that the branching decisions in each disjunctive term
+ * are sorted in the order they occurred.
+ *
+ * @return void
+ */
+void PartialBBDisjunction::isFullBinaryTree(){
+
+  std::vector<DisjunctiveTerm> terms_copy = terms;
+
+  // check that term does not contain term2
+  // we can get away with just checking for ancestral relationship because it
+  // isn't possible to end up with the same branching decisions just in different order
+  for (const DisjunctiveTerm& term : terms_copy){
+    for (const DisjunctiveTerm& term2 : terms_copy){
+
+      // term can only contain term2 if term2 is at least as deep in the tree
+      if (&term != &term2 && term.changed_var.size() <= term2.changed_var.size()){
+
+        // make sure that term is not an ancestor of term2 by checking they branch
+        // on different variables or at least in different directions
+        verify(!std::equal(term2.changed_var.begin(), term2.changed_var.begin() +
+                                                      term.changed_var.size(), term.changed_var.begin()) ||
+               !std::equal(term2.changed_bound.begin(), term2.changed_bound.begin() +
+                                                        term.changed_bound.size(), term.changed_bound.begin()),
+               "the LP relaxation of term contains the LP relaxation of term2");
+      }
+    }
+  }
+
+  // get the maximum depth
+  int max_depth = 0;
+  for (DisjunctiveTerm term : terms_copy){
+    max_depth = term.changed_var.size() > max_depth ? term.changed_var.size() : max_depth;
+  }
+
+  // check each leaf has a sibling
+  for (int depth = max_depth; depth > 0; depth--){
+
+    // get the terms at this depth
+    std::vector<DisjunctiveTerm> depth_terms;
+    for (DisjunctiveTerm term : terms_copy){
+      if (term.changed_var.size() == depth){
+        depth_terms.push_back(term);
+      }
+    }
+
+    // keep a running list of paired terms
+    std::set<const DisjunctiveTerm*> paired_terms;
+
+    // find a sibling for each term
+    for (const DisjunctiveTerm& term : depth_terms){
+
+      // Check if the term was found to be another's sibling earlier
+      if (paired_terms.find(&term) != paired_terms.end()){
+        continue;
+      }
+
+      // check term against all other terms at this depth
+      for (const DisjunctiveTerm& term2 : depth_terms){
+        std::vector<int> differing_idx;
+
+        // we can only be siblings if we share the same variables that were
+        // branched on and we're not the same term
+        if (term.changed_var == term2.changed_var && &term != &term2){
+
+          // record branching directions we differ on
+          for (int i = 0; i < depth; i++) {
+            if (term.changed_bound[i] != term2.changed_bound[i]) {
+              differing_idx.push_back(i);
+            }
+          }
+
+          // if we differ by only the last branching decision, we're siblings
+          if (differing_idx.size() == 1 && differing_idx[0] == depth - 1){
+            // check that we have the reciprocal branching decision
+            double expected_val = term.changed_value[differing_idx[0]] +
+                                  (term.changed_bound[differing_idx[0]] == 0 ? -1 : 1);
+            verify(term2.changed_value[differing_idx[0]] == expected_val,
+                   "term2 branch value doesnt meet expectation");
+
+            // record siblings
+            paired_terms.insert(&term);
+            paired_terms.insert(&term2);
+
+            // create a parent node to leave in the next level above
+            DisjunctiveTerm parent_term = term;
+            parent_term.changed_var.erase(parent_term.changed_var.begin() + differing_idx[0]);
+            parent_term.changed_bound.erase(parent_term.changed_bound.begin() + differing_idx[0]);
+            parent_term.changed_value.erase(parent_term.changed_value.begin() + differing_idx[0]);
+            parent_term.type = "parent";
+            terms_copy.push_back(parent_term);
+            break;
+          }
+        }
+      }
+
+      // if we didn't find a sibling, the disjunction is not complete
+      if (paired_terms.find(&term) == paired_terms.end()){
+        verify(false, "Disjunction does not represent a full binary tree.");
+      }
+
+    } // find a sibling for each term
+  }
+} /* isFullBinaryTree */

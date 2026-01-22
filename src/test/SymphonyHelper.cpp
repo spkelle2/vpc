@@ -40,7 +40,9 @@ void setStrategyForBBTestSymphony(const VPCParameters& params, const int strateg
 
   // set parameters
   int seed = params.get(intParam::RANDOM_SEED);
-  if (seed >= 0) model->setSymParam("random_seed", 42);
+  if (seed >= 0) {
+    model->setSymParam("random_seed", seed);
+  }
 
   // ---- Always-set basics ----
   model->setSymParam("time_limit", params.get(doubleParam::BB_TIMELIMIT));

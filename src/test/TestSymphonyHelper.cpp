@@ -39,6 +39,7 @@ TEST_CASE("Test doBranchAndBoundWithSymphony", "[SymphonyHelper::doBranchAndBoun
   vpc_params.set(VPCParametersNamespace::MODE, 0);  // partial BB tree
   vpc_params.set(VPCParametersNamespace::PARTIAL_BB_KEEP_PRUNED_NODES, 1);
   vpc_params.set(VPCParametersNamespace::SOLFILE, "../test/bm23.sol");
+  vpc_params.set(DISJUNCTION_SOLVER, "SYMPHONY");
 
   // set parameters to use provided bound and skip heuristics
   vpc_params.set(BB_STRATEGY, get_bb_option_value({
@@ -62,14 +63,18 @@ TEST_CASE("Test doBranchAndBoundWithSymphony", "[SymphonyHelper::doBranchAndBoun
     OsiCuts vpcs;
     CglVPC gen = CglVPC(vpc_params);
     gen.generateCuts(si, vpcs);
-    solver->applyCuts(vpcs);  // cuts have to be added to model else Symphony will quit
+
+    // check when we use symphony to generate vpcs we see reasonable improvements
+    si.applyCuts(vpcs);
+    si.resolve();
+    REQUIRE(si.getObjValue() > 25);  // should improve a lot over LP bound of 20.57
+    REQUIRE(si.getObjValue() < 30);  // but not too much
 
     // solve with symphony
     BBInfo info;
     std::shared_ptr<OsiSymSolverInterface> parametric_model = std::shared_ptr<OsiSymSolverInterface>();
     doBranchAndBoundWithSymphony(vpc_params, vpc_params.get(BB_STRATEGY), solver,
                                  info, &vpcs, parametric_model);
-
 
     // check that we're optimal
     REQUIRE(info.obj == info.bound);

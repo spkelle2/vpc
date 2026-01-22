@@ -2069,117 +2069,12 @@ int VPCEventHandler::saveInformationWithPrunes() {
     printf("Number of expected pruned and complement terms: %d\n", numPrunedNodes_);
     printf("Number of expected leaf terms: %d\n", numLeafNodes_);
 #endif
-    isFullBinaryTree();
+    owner->isFullBinaryTree();
     verify(numLeafNodes_ + numPrunedNodes_ == owner->num_terms,
            "the size of our disjunction is not what we expected it to be");
   }
   return 0;
 } /* saveInformationWithPrunes */
 
-/**
- * @details check if the disjunction represents the leaves of a full binary tree.
- * This function assumes that the branching decisions in each disjunctive term
- * are sorted in the order they occurred.
- *
- * @return true if the tree of the disjunction is complete, false otherwise
- */
-void VPCEventHandler::isFullBinaryTree(){
 
-  std::vector<DisjunctiveTerm> terms = owner->terms;
-
-  // check that term does not contain term2
-  // we can get away with just checking for ancestral relationship because it
-  // isn't possible to end up with the same branching decisions just in different order
-  for (const DisjunctiveTerm& term : terms){
-    for (const DisjunctiveTerm& term2 : terms){
-
-      // term can only contain term2 if term2 is at least as deep in the tree
-      if (&term != &term2 && term.changed_var.size() <= term2.changed_var.size()){
-
-        // make sure that term is not an ancestor of term2 by checking they branch
-        // on different variables or at least in different directions
-        verify(!std::equal(term2.changed_var.begin(), term2.changed_var.begin() +
-                           term.changed_var.size(), term.changed_var.begin()) ||
-               !std::equal(term2.changed_bound.begin(), term2.changed_bound.begin() +
-                           term.changed_bound.size(), term.changed_bound.begin()),
-               "the LP relaxation of term contains the LP relaxation of term2");
-      }
-    }
-  }
-
-  // get the maximum depth
-  int max_depth = 0;
-  for (DisjunctiveTerm term : terms){
-    max_depth = term.changed_var.size() > max_depth ? term.changed_var.size() : max_depth;
-  }
-
-  // check each leaf has a sibling
-  for (int depth = max_depth; depth > 0; depth--){
-
-    // get the terms at this depth
-    std::vector<DisjunctiveTerm> depth_terms;
-    for (DisjunctiveTerm term : terms){
-      if (term.changed_var.size() == depth){
-        depth_terms.push_back(term);
-      }
-    }
-
-    // keep a running list of paired terms
-    std::set<const DisjunctiveTerm*> paired_terms;
-
-    // find a sibling for each term
-    for (const DisjunctiveTerm& term : depth_terms){
-
-      // Check if the term was found to be another's sibling earlier
-      if (paired_terms.find(&term) != paired_terms.end()){
-        continue;
-      }
-
-      // check term against all other terms at this depth
-      for (const DisjunctiveTerm& term2 : depth_terms){
-        std::vector<int> differing_idx;
-        
-        // we can only be siblings if we share the same variables that were
-        // branched on and we're not the same term
-        if (term.changed_var == term2.changed_var && &term != &term2){
-          
-          // record branching directions we differ on
-          for (int i = 0; i < depth; i++) {
-            if (term.changed_bound[i] != term2.changed_bound[i]) {
-              differing_idx.push_back(i);
-            }
-          }
-
-          // if we differ by only the last branching decision, we're siblings
-          if (differing_idx.size() == 1 && differing_idx[0] == depth - 1){
-            // check that we have the reciprocal branching decision
-            double expected_val = term.changed_value[differing_idx[0]] +
-                                  (term.changed_bound[differing_idx[0]] == 0 ? -1 : 1);
-            verify(term2.changed_value[differing_idx[0]] == expected_val,
-                   "term2 branch value doesnt meet expectation");
-
-            // record siblings
-            paired_terms.insert(&term);
-            paired_terms.insert(&term2);
-
-            // create a parent node to leave in the next level above
-            DisjunctiveTerm parent_term = term;
-            parent_term.changed_var.erase(parent_term.changed_var.begin() + differing_idx[0]);
-            parent_term.changed_bound.erase(parent_term.changed_bound.begin() + differing_idx[0]);
-            parent_term.changed_value.erase(parent_term.changed_value.begin() + differing_idx[0]);
-            parent_term.type = "parent";
-            terms.push_back(parent_term);
-            break;
-          }
-        }
-      }
-
-      // if we didn't find a sibling, the disjunction is not complete
-      if (paired_terms.find(&term) == paired_terms.end()){
-        verify(false, "Disjunction does not represent a full binary tree.");
-      }
-      
-    } // find a sibling for each term
-  }
-}
 

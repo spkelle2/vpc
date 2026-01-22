@@ -213,3 +213,49 @@ TEST_CASE("Test saveInformation", "[VPCEventHandler::saveInformation]") {
   }
 }
 
+// --------------------- test current behavior remains -------------------------
+TEST_CASE("Test generatePartialBBTreeSymphony", "[PartialBBDisjunction::generatePartialBBTreeSymphony][symphony]") {
+
+  // parameters
+  VPCParametersNamespace::VPCParameters vpc_params;
+  vpc_params.set(VPCParametersNamespace::DISJ_TERMS, 64);
+  vpc_params.set(VPCParametersNamespace::MODE, 0);  // partial BB tree
+  vpc_params.set(VPCParametersNamespace::DISJUNCTION_SOLVER, "SYMPHONY");
+
+  // solver
+  OsiClpSolverInterface si;
+  SolverInterface* solver;
+  si.readMps("../test/bm23.mps");
+  si.initialSolve();
+  std::vector<double> sol(si.getColSolution(), si.getColSolution() + si.getNumCols());
+  solver = const_cast<SolverInterface*>(dynamic_cast<const SolverInterface*>(&si));
+
+  SECTION("Test Symphony") {
+    PartialBBDisjunction disjunction(vpc_params);
+    generatePartialBBTreeSymphony(&disjunction, solver);
+
+    // check values of changed_var, changed_bound and changed_value are reasonable
+    disjunction.isFullBinaryTree();
+
+    // check range of term objectives - reported best/worst should match computed
+    double best_obj = 1e300;
+    double worst_obj = -1e300;
+    for (const auto& term : disjunction.terms){
+      if (term.obj < best_obj){
+        best_obj = term.obj;
+      }
+      if (term.obj > worst_obj){
+        worst_obj = term.obj;
+      }
+    }
+    REQUIRE(isVal(disjunction.best_obj, best_obj, .1));
+    REQUIRE(isVal(disjunction.worst_obj, worst_obj, .1));
+
+    // check metadata we should care about
+    REQUIRE(isVal(disjunction.root_obj, 20.57, .1));
+    REQUIRE(disjunction.num_terms == 64);
+    REQUIRE(disjunction.terms.size() == 64);
+  }
+}
+
+

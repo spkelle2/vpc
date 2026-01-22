@@ -223,9 +223,6 @@ void Disjunction::getSolverForTerm(
 #endif
   int orig_iters = termSolver->getIterationCount();
   termSolver->resolve();
-  if (orig_iters + 3 < termSolver->getIterationCount()){
-    int x = 5;
-  }
   bool calcAndFeasTerm = checkSolverOptimality(termSolver, true);
 
   // Sometimes we run into a few issues getting the ``right'' value
