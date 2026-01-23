@@ -28,6 +28,8 @@ using namespace VPCParametersNamespace;
 #ifdef USE_SYMPHONY
 
 #include "SymphonyHelper.hpp" // doBranchAndBoundWithSymphony
+#include "sym_tm.h"
+#include "sym_master.h"
 
 
 // --------------------- test current behavior remains -------------------------
@@ -72,9 +74,10 @@ TEST_CASE("Test doBranchAndBoundWithSymphony", "[SymphonyHelper::doBranchAndBoun
 
     // solve with symphony
     BBInfo info;
+    node_times times;
     std::shared_ptr<OsiSymSolverInterface> parametric_model = std::shared_ptr<OsiSymSolverInterface>();
     doBranchAndBoundWithSymphony(vpc_params, vpc_params.get(BB_STRATEGY), solver,
-                                 info, &vpcs, parametric_model);
+                                 info, &vpcs, parametric_model, &times);
 
     // check that we're optimal
     REQUIRE(info.obj == info.bound);
@@ -82,18 +85,14 @@ TEST_CASE("Test doBranchAndBoundWithSymphony", "[SymphonyHelper::doBranchAndBoun
     // should have done some branching with a few LP iterations each
     REQUIRE(0 < info.nodes);
     REQUIRE(info.nodes < info.iters);
+    REQUIRE(0 < info.time);
     // dual bound monotonically improves
-    REQUIRE(si.getObjValue() < info.last_cut_pass);
-    REQUIRE(info.last_cut_pass < info.bound);
-    // time increases monotonically
-    REQUIRE(0 < info.root_time);
-    REQUIRE(info.root_time < info.time);
-    // nodes increase monotonically
-    REQUIRE(0 < info.root_passes);
-    REQUIRE(info.root_passes <= info.nodes);
-    // iterations increase monotonically
-    REQUIRE(0 < info.root_iters);
-    REQUIRE(info.root_iters <= info.iters);
+    REQUIRE(si.getObjValue() < info.bound);
+
+    // times that should be nonzero
+    REQUIRE(times.lp > 0.01);
+    REQUIRE(times.strong_branching > 0.01);
+    REQUIRE(times.primal_heur > 0.01);
   }
 
   SECTION( "Test objective perturbed warm-start" ) {
@@ -135,31 +134,20 @@ TEST_CASE("Test doBranchAndBoundWithSymphony", "[SymphonyHelper::doBranchAndBoun
 
     // check monotonicity for warm start solve
     // time increases monotonically
-    REQUIRE(0 < info_ws.root_time);
-    REQUIRE(info_ws.root_time <= info_ws.time);
+    REQUIRE(0 < info_ws.time);
     // nodes increase monotonically
-    REQUIRE(0 < info_ws.root_passes);
-    REQUIRE(info_ws.root_passes <= info_ws.nodes);
+    REQUIRE(0 < info_ws.nodes);
     // iterations increase monotonically
-    REQUIRE(0 <= info_ws.root_iters);
-    REQUIRE(info_ws.root_iters <= info_ws.iters);
+    REQUIRE(0 < info_ws.iters);
 
     // this small of warm start should improve iterations but not time
     REQUIRE(info_ws.iters < info.iters);
     REQUIRE(info_ws.time < info.time);
 
-    // root dual bound should be better with warm start
-    REQUIRE(info.last_cut_pass <= info_ws.last_cut_pass);
-
     // final bounds should be the same
     REQUIRE(info_ws.bound == info_ws.obj);
     REQUIRE(info_ws.bound == info.bound);
     REQUIRE(info_ws.obj == info.obj);
-
-    // a 64 node warm start should have roughly that many nodes at the root
-    REQUIRE((info_ws.root_passes > 60 && info_ws.root_passes <= 64));
-    // bound should be intermediate between initial and final
-    REQUIRE((27 < info_ws.last_cut_pass && info_ws.last_cut_pass < 28));
   }
 
   SECTION( "Test rhs-perturbed warm-start" ){
@@ -199,21 +187,15 @@ TEST_CASE("Test doBranchAndBoundWithSymphony", "[SymphonyHelper::doBranchAndBoun
 
     // check monotonicity for warm start solve
     // time increases monotonically
-    REQUIRE(0 < info_ws.root_time);
-    REQUIRE(info_ws.root_time <= info_ws.time);
+    REQUIRE(0 < info_ws.time);
     // nodes increase monotonically
-    REQUIRE(0 < info_ws.root_passes);
-    REQUIRE(info_ws.root_passes <= info_ws.nodes);
+    REQUIRE(0 < info_ws.nodes);
     // iterations increase monotonically
-    REQUIRE(0 <= info_ws.root_iters);
-    REQUIRE(info_ws.root_iters <= info_ws.iters);
+    REQUIRE(0 < info_ws.iters);
 
     // warm start should improve performance
     REQUIRE(info_ws.iters < info.iters);
     REQUIRE(info_ws.time < info.time);
-
-    // root dual bound should be better with warm start
-    REQUIRE(info.last_cut_pass <= info_ws.last_cut_pass);
 
     // final bounds should be the same
     REQUIRE(info_ws.bound == info_ws.obj);
@@ -263,19 +245,15 @@ TEST_CASE("Test doBranchAndBoundWithSymphony", "[SymphonyHelper::doBranchAndBoun
     REQUIRE(info_ws.bound == -93);
 
     // dual bound and time monotonically improve
-    REQUIRE(si_ptb->getObjValue() < info_ws.last_cut_pass); // -97, -96
-    REQUIRE(info_ws.last_cut_pass < info_ws.bound);
+    REQUIRE(si_ptb->getObjValue() < info_ws.bound);
 
     // check monotonicity for warm start solve
     // time increases monotonically
-    REQUIRE(0 < info_ws.root_time);
-    REQUIRE(info_ws.root_time <= info_ws.time);
+    REQUIRE(0 < info_ws.time);
     // nodes increase monotonically
-    REQUIRE(0 < info_ws.root_passes);
-    REQUIRE(info_ws.root_passes <= info_ws.nodes);
+    REQUIRE(0 < info_ws.nodes);
     // iterations increase monotonically
-    REQUIRE(0 <= info_ws.root_iters);
-    REQUIRE(info_ws.root_iters <= info_ws.iters);
+    REQUIRE(0 < info_ws.iters);
   }
 
   SECTION( "Test warm-start lower bound for RHS changes" ) {
@@ -320,18 +298,14 @@ TEST_CASE("Test doBranchAndBoundWithSymphony", "[SymphonyHelper::doBranchAndBoun
 
     // dual bound and time monotonically improve
     // main test here is just finding a gap at last cut pass (i.e. after root node)
-    REQUIRE(si_ptb->getObjValue() < info_ws.last_cut_pass);  // 43, 51
-    REQUIRE(info_ws.last_cut_pass < info_ws.bound);
+    REQUIRE(si_ptb->getObjValue() < info_ws.bound);
     // check monotonicity for warm start solve
     // time increases monotonically
-    REQUIRE(0 < info_ws.root_time);
-    REQUIRE(info_ws.root_time <= info_ws.time);
+    REQUIRE(0 < info_ws.time);
     // nodes increase monotonically
-    REQUIRE(0 < info_ws.root_passes);
-    REQUIRE(info_ws.root_passes <= info_ws.nodes);
+    REQUIRE(0 < info_ws.nodes);
     // iterations increase monotonically
-    REQUIRE(0 <= info_ws.root_iters);
-    REQUIRE(info_ws.root_iters <= info_ws.iters);
+    REQUIRE(0 < info_ws.iters);
   }
 
 }

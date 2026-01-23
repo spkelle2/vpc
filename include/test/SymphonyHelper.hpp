@@ -18,6 +18,8 @@ namespace VPCParametersNamespace {
 #include "OsiSymSolverInterface.hpp"
 #include <memory> // shared_ptr
 
+typedef struct NODE_TIMES node_times;
+
 std::shared_ptr<CoinWarmStart> getWarmStartShared(OsiSymSolverInterface& model);
 
 // set requested parameters for Symphony
@@ -28,5 +30,5 @@ void setStrategyForBBTestSymphony(const VPCParametersNamespace::VPCParameters& p
 void doBranchAndBoundWithSymphony(
     const VPCParametersNamespace::VPCParameters& params, int strategy,
     const OsiSolverInterface* const si, BBInfo& info, const OsiCuts* cuts,
-    std::shared_ptr<OsiSymSolverInterface>& parametric_model);
+    std::shared_ptr<OsiSymSolverInterface>& parametric_model, node_times* times=nullptr);
 #endif /* USE_SYMPHONY */

@@ -94,7 +94,8 @@ void setStrategyForBBTestSymphony(const VPCParameters& params, const int strateg
 // no getting around providing OsiSymSolverInterface, passing just a warm start does not work
 void doBranchAndBoundWithSymphony(
     const VPCParameters& params, int strategy, const OsiSolverInterface* const si,
-    BBInfo& info, const OsiCuts* cuts, std::shared_ptr<OsiSymSolverInterface>& parametric_model) {
+    BBInfo& info, const OsiCuts* cuts, std::shared_ptr<OsiSymSolverInterface>& parametric_model,
+    node_times* times) {
 
   // create solution and pool containers in case needed later
   // this needs to happen before we create the model so they still exist when
@@ -108,13 +109,17 @@ void doBranchAndBoundWithSymphony(
   bool provide_sol = (strategy > 0) && use_bb_option(strategy, BB_Strategy_Options::use_best_bound);
   bool provide_parametric = (parametric_model != nullptr);
 
+  // set up time tracking if not provided
+  node_times local_times;
+  if (!times) {
+    times = &local_times;
+  }
+
   // create a Symphony model for the input problem si
   std::shared_ptr<OsiSymSolverInterface> input_model = std::make_shared<OsiSymSolverInterface>();
-  std::shared_ptr<OsiSymSolverInterface> root_model = std::make_shared<OsiSymSolverInterface>();
   std::string f_name;
   createTmpFileCopy(params, si, f_name);
   input_model->readMps(f_name.c_str());
-  root_model->readMps(f_name.c_str());
 
   // input cuts in a standardized <= sense if provided
   OsiCuts cuts_std;
@@ -160,7 +165,6 @@ void doBranchAndBoundWithSymphony(
     }
 
     input_model->applyCuts(cuts_std);
-    root_model->applyCuts(cuts_std);
   }
 
   // if provided a parametric model, modify it to match input_model
@@ -208,43 +212,19 @@ void doBranchAndBoundWithSymphony(
 
   // get pointer to sym environments for later use
   sym_environment * env = parametric_model->getSymphonyEnvironment();
-  sym_environment * root_env = root_model->getSymphonyEnvironment();
 
   // set strategy parameters
   setStrategyForBBTestSymphony(params, strategy, parametric_model);
-  setStrategyForBBTestSymphony(params, strategy, root_model);
 
   // copy over warm start from the parametric model to the root model
   if (env->warm_start){
     // remove any existing solution pool to make it fair vs cut generation only
     FREE(env->sp);
     env->warm_start->best_sol = lp_sol();
-
-    // copy over the warm start structure
-    root_env->warm_start = create_copy_warm_start(env->warm_start);
-    root_env->warm_start->force_resolve_tree = true;  // resolve the tree to get the correct bound
-    root_env->mip = create_copy_mip_desc(env->mip);
+    env->warm_start->lb = -std::numeric_limits<double>::max();
+    env->warm_start->has_ub = 0;
+    env->warm_start->ub = 0;
   }
-
-  // resolve each node in the tree to get the bound
-  root_model->setSymParam("node_limit", 1);
-  root_model->resolve();
-  info.last_cut_pass = root_env->tm->lb;
-
-  // process just the first node (without resolving the tree to get the correct time info) to start
-  parametric_model->setSymParam("node_limit", 1);
-  parametric_model->resolve();
-
-  // capture first node specific stats
-  info.root_time = env->comp_times.readtime + env->comp_times.ub_overhead +
-    env->comp_times.ub_heurtime + env->comp_times.lb_overhead +
-    env->comp_times.lb_heurtime + env->tm->comp_times.communication +
-    env->tm->comp_times.lp + env->tm->comp_times.lp_setup +
-    env->tm->comp_times.separation + env->tm->comp_times.fixing +
-    env->tm->comp_times.pricing + env->tm->comp_times.strong_branching +
-    env->tm->comp_times.cut_pool + env->tm->comp_times.primal_heur;
-  info.root_iters =  env->tm->lp_stat.lp_iter_num;
-  info.root_passes = env->tm->stat.analyzed;  // represents nodes processed so far
 
   // set primal warm start if requested
   if (provide_sol) {
@@ -309,17 +289,16 @@ void doBranchAndBoundWithSymphony(
   // nodes - they're cumulative across resolves so no special handling
   info.nodes = env->tm->stat.analyzed;
 
-  // iterations - also cumulative across reesolves
+  // iterations - also cumulative across resolves
   info.iters = env->tm->lp_stat.lp_iter_num;
 
   // total time
-  info.time = env->comp_times.readtime + env->comp_times.ub_overhead +
-    env->comp_times.ub_heurtime + env->comp_times.lb_overhead +
-    env->comp_times.lb_heurtime + env->tm->comp_times.communication +
+  info.time = env->tm->comp_times.communication +
     env->tm->comp_times.lp + env->tm->comp_times.lp_setup +
     env->tm->comp_times.separation + env->tm->comp_times.fixing +
     env->tm->comp_times.pricing + env->tm->comp_times.strong_branching +
     env->tm->comp_times.cut_pool + env->tm->comp_times.primal_heur;
+  *times = env->tm->comp_times;
 
   // remove temporary files from createTmpFileCopy
   std::string f_name_no_ext = f_name.substr(0, f_name.size() - 4);
