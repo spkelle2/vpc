@@ -282,9 +282,9 @@ void doBranchAndBoundWithSymphony(
   parametric_model->resolve();
 
   // bounds
-  info.bound = env->tm->lb;
+  info.bound = env->tm->lb + env->tm->obj_offset;
   // if we don't have a primal bound to report, use the provided bound
-  info.obj = env->tm->ub != 0 ? env->tm->ub : obj_value;
+  info.obj = env->tm->ub != 0 ? env->tm->ub + env->tm->obj_offset : obj_value;
 
   // nodes - they're cumulative across resolves so no special handling
   info.nodes = env->tm->stat.analyzed;
